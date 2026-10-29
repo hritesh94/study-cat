@@ -284,6 +284,14 @@ In Supabase: **SQL Editor → New query**, paste the whole file, then **Run**. R
   - The result updates the top bar, shows **"+N coins"** over the cat, and the cat turns to face you.
 - **First login** (`import_local_progress`, once per account): this browser's total study minutes are saved as `legacy_minutes` (history only, so editing localStorage can't earn coins), and your `studycat:cat` choice becomes your profile's look.
 
+#### Login emails: sent through Brevo
+At first, magic links took ages: Supabase's built-in email sender is only for trying things out (slow, a few emails an hour, often in Spam). So login emails now go through **Brevo** (free plan: 300 emails a day), connected in Supabase under **Authentication → Emails → SMTP Settings**:
+- Host `smtp-relay.brevo.com`, port `587`, username = the Brevo SMTP login (`…@smtp-brevo.com`), password = a Brevo **SMTP key**. That key is a secret, so it lives only in Supabase's dashboard, never in the code or `.env.local`.
+- Sender: **Study Cat <ghte98@gmail.com>**, verified in Brevo under **Settings → Senders, domains, IPs**.
+- **Authentication → Rate Limits** was raised so testing isn't blocked.
+- **No domain yet:** sending "from" a Gmail address works, but Brevo warns about it ("Freemail domain is not recommended", default DKIM), and some emails may land in Spam. When the app gets real users, buy a domain (e.g. `study-cat.com` looked unregistered), authenticate it in Brevo's **Domains** tab (it gives you DNS records), and switch the sender. No code changes are needed.
+- If a login email doesn't arrive: check Spam, then **Brevo → Transactional → Logs**, then **Supabase → Logs → Auth**.
+
 #### Testing the database without touching the real one
 `npm run test:db` runs all three migrations in **PGlite** (real Postgres compiled to WebAssembly, inside Node), with a stand-in for Supabase's `auth` schema, roles and default "everyone can do everything" grants. Two pretend users, Ana and Ben, go through **44 checks**: each sees only their own data, coins, streak, sessions, items and settings can't be written directly, session times come from the server, the daily cap holds, fake dates are pulled back, streaks count and reset, and the import happens once.
 
@@ -432,7 +440,7 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
 ## 6. Known limitations
 
 - Minutes are stored **per browser**: your friend's minutes and yours aren't shared or synced. (With an account, coins and streaks *are* saved online; "Today: N min" still counts this browser.)
-- Supabase's built-in email sender only allows a few emails per hour. For real use, set up your own email provider (SMTP) in Supabase.
+- Login emails come from a Gmail address through Brevo (no domain yet), so a few may land in Spam until a real domain is set up.
 - If the tab is closed in the middle of a session, that session earns nothing (the server closes it with 0 the next time you start).
 - A trickster can still move their "today" up to 1 day ahead, but that only uses up tomorrow's cap early. It can't add coins beyond the real minutes studied.
 - Clearing browser data erases your minutes.
