@@ -441,7 +441,7 @@ Commits: `d22bbe7` AI core, `479c7ca` part 1 (chat), `0a02724` part 2 (goals and
    11. `supabase/migrations/20261030000011_weekly_reports.sql`
 
    They're safe for the live site, which doesn't use them yet: they only add things. `end_session` keeps the same inputs, and `daily_totals` just gets one more column (the 👑).
-5. **Deploy the 4 Edge Functions** (chat, roadmap, quiz, report): `npx supabase functions deploy --use-api`. (`--use-api` builds them on Supabase's side, so Docker isn't needed.)
+5. **Deploy the 4 Edge Functions** (chat, roadmap, quiz, report): `npx supabase functions deploy --use-api`. ✅ Done: steps 1–5 were done on 2026-10-30, and the chat answered. (`--use-api` builds them on Supabase's side, so Docker isn't needed.)
 6. **Check that they respond.** Without a login token, every function must refuse:
    ```bash
    curl -i -X POST https://cnkdfgafyqpofnyzhqcb.supabase.co/functions/v1/chat -H "Content-Type: application/json" -d "{\"message\":\"hi\"}"
@@ -454,9 +454,14 @@ The live app (on `main`) doesn't have the AI yet: it comes with the merge, after
 - **The key never leaves Supabase.** Only the Edge Functions (`supabase/functions/`) talk to the AI. They read `GEMINI_API_KEY` from the secret on the server. The browser sends your login token, never a key.
 - **Logged-in users only.** Supabase checks the login token before a function runs (`verify_jwt = true` in `supabase/config.toml`), and the function checks it again with Supabase Auth (`_shared/deno.js`). Without a valid login: 401. When the function reads the database, it does so *as you*, so Row Level Security applies.
 - **One small module picks the AI:** `_shared/providers/index.js`, chosen by the `AI_PROVIDER` secret (`gemini` when it's not set). Another provider just needs the same `generate()` function.
-- **The model, in one place:** `_shared/config.js`: `gemini-3.8-flash`, checked on 2026-10-30 against Google's model list (stable) and pricing page ("Free of charge" on the free tier). It's called through `generateContent` (stateless: Google doesn't keep the conversation) with `thinkingLevel: "low"`. Flash can't switch thinking off, and thinking counts toward the output limit, so the limits leave room for it.
+- **The models, in one place:** `_shared/config.js`: `gemini-3.6-flash` first, `gemini-3.8-flash` as the backup. Both were checked on 2026-10-30 against Google's model list (stable) and pricing page ("Free of charge" on the free tier). 3.8 is the newest, but it answered "this model is currently experiencing high demand" to the first free-tier calls, so 3.6 goes first. They're called through `generateContent` (stateless: Google doesn't keep the conversation) with `thinkingLevel: "low"`. Flash can't switch thinking off, and thinking counts toward the output limit, so the limits leave room for it.
 - **Daily limits per user** (the free tier is shared by everyone): **30 chat messages, 3 roadmaps, 10 quizzes, 1 weekly report** a day, in `game_settings` (`ai_*_daily_limit`). The function reserves a call in `ai_usage` *before* asking the AI (`ai_reserve`, one atomic step), and gives it back if the AI fails (`ai_release`). Only the functions' server key may call those; if users could, they could give calls back forever. The day is the UTC day.
-- **Rate limits:** a 429 from Gemini is retried once after 2.5 s; a second one becomes "The cat is tired, try again in a minute."
+- **When Google is busy:**
+  - A 429 (the rate limit) is retried once after 2.5 s.
+  - A 503 ("high demand"), or no answer within the time limit (chat 12 s, quiz 25 s, report 20 s, roadmap 55 s), goes straight to the backup model.
+  - When both are busy, the cat says "The cat is tired, try again in a minute.", and the chat shows "Still thinking…" while it waits.
+  - Google's reason is written to the function's logs (Supabase → Edge Functions → Logs).
+  - The first real chats hit exactly this: 3.8 was overloaded and "hello" took ages, then failed. The chat answered after the change.
 - **Input and output limits:** text fields up to 8,000 characters (chat box 2,000), syllabus photos shrunk in the browser to 1600 px JPEG and refused over 5 MB. Output tokens are capped per feature, and every AI answer is JSON that's checked field by field before it's used or saved.
 - **Every AI panel says "Don't paste private or personal information."**
 - **The cat's voice:** every system prompt is built by `systemPrompt()` (`_shared/prompts.js`), which starts with `catVoice(profile)` (`_shared/catVoice.js`): warm, cozy, short sentences. That's the one place where tone is decided; personalities can go there later.
@@ -517,7 +522,7 @@ The live app (on `main`) doesn't have the AI yet: it comes with the merge, after
 
 #### Tested
 - `npm run test:ai` (new): **115 checks**, in Node with a fake AI and a fake database. It covers:
-  - the Gemini request (key in the header, schema, limits, low thinking), skipping its thinking, and the 429 retry then "tired"
+  - the Gemini request (key in the header, schema, limits, low thinking), skipping its thinking, and busy models (429 retry, straight to the backup on "high demand" or a time-out, then "tired")
   - the prompt order (catVoice first, safety last)
   - distress detection (8 serious messages caught, 5 idioms not)
   - the login check, limits before any AI call, calls given back on failure
@@ -647,7 +652,7 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run lint` | Checks the code for common mistakes (oxlint) |
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
 | `npm run test:db` | Tests the Supabase migrations locally (pretend users, 161 checks) |
-| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (115 checks) |
+| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (122 checks) |
 | `npx supabase functions deploy --use-api` | Deploys the 4 AI functions (after `npx supabase login` and `link`) |
 | `npx supabase secrets list` | Shows which secrets are set (never their values) |
 | `npm run voice:lines` | Writes every cat line with its id to `voice-lines.csv` |
