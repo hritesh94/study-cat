@@ -3,6 +3,8 @@
 A Pomodoro study timer with a 3D cat companion.
 Built with React + Vite + React Three Fiber.
 
+**Live:** https://study-cat-pink.vercel.app · **Full build history and explanations:** [PROJECT_LOG.md](PROJECT_LOG.md)
+
 ## Run it
 
 ```bash
