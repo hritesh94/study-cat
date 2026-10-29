@@ -8,73 +8,69 @@
 // room pixels (the room is 320 wide; the floor line where the cat stands
 // is y = 150, the wall is above y ≈ 96).
 //
-// ART: every `art` is null for now, so simple placeholder shapes are
-// drawn. To use real art, put a PNG in public/game/room/ and write its
-// path here (e.g. art: '/game/room/plant-sprout.png'). The image is
-// drawn at the size given next to it, anchored at the bottom centre. No
-// other code needs to change.
+// ART: every `art` names an image in public/game/room/room.json (from the
+// sprite pack, made by tools/cat-generator-hd/generator/props.py). room.json
+// gives each image's file, size and ORIGIN: the point that touches the
+// shelf, sill or floor. The image is drawn with that origin at the x, y
+// below, at the cat's scale, so the room art and the cat match in size.
 // ──────────────────────────────────────────────────────────────────────────
 
+import { CAT_SCALE } from './layout'
+
 export const ROOM_PROGRESS = {
+  scale: CAT_SCALE, // room art is drawn at the same scale as the cat sheets
+
   bookshelf: {
-    // the shelf board, on the empty wall between the plant and the picture
-    x: 146, // left end
-    y: 64, // top of the board = where the books stand
-    width: 98, // books fill it from the left; the coin jar stands at the right end
-    art: null, // whole shelf image (width × 12), drawn under the books
-    book: {
-      height: [13, 18], // books get a height in this range (it varies, like real books)
-      gap: 0.6,
-      art: null, // one book image, tinted with the subject's colour and stretched to size
-    },
-    // a book's thickness from that subject's total study hours
-    thickness: [
-      { hours: 0, width: 3 },
-      { hours: 1, width: 4 },
-      { hours: 3, width: 5 },
-      { hours: 8, width: 6.5 },
-      { hours: 20, width: 8 },
-      { hours: 50, width: 10 },
+    // the middle of the plank's top (the shelf's origin), on the empty wall
+    // between the plant and the picture. Books stand on this line.
+    x: 190,
+    y: 64,
+    art: 'shelf',
+    gap: 1, // art pixels between two books
+    // a book's thickness from that subject's total study hours: the
+    // thickest one whose `hours` you've reached. Each book is a cover
+    // (light grey, tinted with the subject's colour) with pages on top.
+    books: [
+      { hours: 0, cover: 'book_0_cover', pages: 'book_0_pages' },
+      { hours: 1, cover: 'book_1_cover', pages: 'book_1_pages' },
+      { hours: 3, cover: 'book_2_cover', pages: 'book_2_pages' },
+      { hours: 8, cover: 'book_3_cover', pages: 'book_3_pages' },
+      { hours: 20, cover: 'book_4_cover', pages: 'book_4_pages' },
+      { hours: 50, cover: 'book_5_cover', pages: 'book_5_pages' },
     ],
   },
 
   coinJar: {
-    x: 236, // bottom centre, standing on the right end of the shelf…
-    y: 64, // …so the same height as the shelf
-    width: 12,
-    height: 15,
-    art: null, // the empty glass jar, drawn in front of the coins
-    coinColor: 0xf3c34f,
-    sparkles: 5, // how many sparkles twinkle when today's jar is full
+    // standing on the right end of the shelf (books stop before it)
+    x: 213,
+    y: 64,
+    // jar_00 … jar_10 = 0 % … 100 % full; the closest one is shown
+    levels: ['jar_00', 'jar_01', 'jar_02', 'jar_03', 'jar_04', 'jar_05', 'jar_06', 'jar_07', 'jar_08', 'jar_09', 'jar_10'],
+    // looped on top when today's jar is full (same origin as the jar)
+    sparkle: { frames: ['jar_sparkle_0', 'jar_sparkle_1', 'jar_sparkle_2', 'jar_sparkle_3'], fps: 6 },
   },
 
   plant: {
-    x: 46, // bottom centre of the pot, on the window sill
+    x: 46, // the middle of the pot's bottom, on the window sill
     y: 78,
-    // which stage shows: the highest one whose `streak` you've reached
+    // which stage shows: the highest one whose `streak` you've reached.
+    // `droopy`: how it looks after that streak broke (a seed can't droop).
     stages: [
-      { streak: 0, name: 'seed', art: null, size: [12, 10] },
-      { streak: 3, name: 'sprout', art: null, size: [12, 16] },
-      { streak: 7, name: 'leafy', art: null, size: [14, 22] },
-      { streak: 14, name: 'bushy', art: null, size: [18, 26] },
-      { streak: 30, name: 'blooming', art: null, size: [20, 30] },
+      { streak: 0, name: 'seed', art: 'plant_0_seed', droopy: null },
+      { streak: 3, name: 'sprout', art: 'plant_1_sprout', droopy: 'plant_1_sprout_droopy' },
+      { streak: 7, name: 'leafy', art: 'plant_2_leafy', droopy: 'plant_2_leafy_droopy' },
+      { streak: 14, name: 'bushy', art: 'plant_3_bushy', droopy: 'plant_3_bushy_droopy' },
+      { streak: 30, name: 'blooming', art: 'plant_4_blooming', droopy: 'plant_4_blooming_droopy' },
     ],
-    // when a streak broke (you had one, now it's 0): tilt a little, go pale
-    droop: { angle: -10, tint: 0xd8cf9a },
   },
 }
 
 // ── small helpers the room (and tests) use ──
 
-export function bookWidth(hours) {
-  const t = ROOM_PROGRESS.bookshelf.thickness
-  return t.reduce((w, step) => (hours >= step.hours ? step.width : w), t[0].width)
-}
-
-// a stable, "random-looking" height per book, so it doesn't jump around
-export function bookHeight(index) {
-  const [lo, hi] = ROOM_PROGRESS.bookshelf.book.height
-  return lo + ((index * 7 + 3) % 6) * ((hi - lo) / 5)
+// the book for a subject with this many hours
+export function bookFor(hours) {
+  const books = ROOM_PROGRESS.bookshelf.books
+  return books.reduce((pick, b) => (hours >= b.hours ? b : pick), books[0])
 }
 
 export function plantStage(streak) {
@@ -88,3 +84,6 @@ export function plantStage(streak) {
 
 // 0 … 1
 export const jarFill = (todayCoins, dailyCap) => (dailyCap > 0 ? Math.min(1, Math.max(0, todayCoins / dailyCap)) : 0)
+
+// the jar image closest to that fill
+export const jarLevel = (fill) => ROOM_PROGRESS.coinJar.levels[Math.round(fill * (ROOM_PROGRESS.coinJar.levels.length - 1))]

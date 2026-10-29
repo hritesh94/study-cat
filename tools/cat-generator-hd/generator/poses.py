@@ -179,3 +179,58 @@ NOTE=dict(idle='standing, breathing, small head turns, blink',walk='walk cycle, 
  read='reading loop',page_turn='paw flips a page',read_end='paws off book -> sit',sleep_down='sit -> curl up',sleep='curled up, breathing, zzz',
  wake_up='curled -> sit',eat='eating from a bowl',sad='ears down, a tear rolls',play='bats a yarn ball',jump='crouch, leap, tuck, land (move the sprite in the engine)')
 
+
+# ---------- missing transitions ----------
+BOWLP=dict(bowl=[18.5,2.6,0])
+A['eat_start']=trans(mod(STAND,props=BOWLP),EAT,5,props=BOWLP)
+A['eat_end']=list(reversed([mod(STAND,props=BOWLP)]+A['eat_start'][:-1]))
+YARNP=dict(yarn=[21,3.6,3,0])
+A['play_start']=trans(mod(STAND,props=YARNP),CROUCH,5,props=YARNP)
+A['play_end']=list(reversed([mod(STAND,props=YARNP)]+A['play_start'][:-1]))
+A['sad_start']=trans(SIT,SAD,5)
+A['sad_end']=list(reversed([SIT]+A['sad_start'][:-1]))
+# ---------- bath (tub drawn in the frames, centred under the cat) ----------
+def lift(P,dy):
+    q=copy.deepcopy(P)
+    for k in ('H','C','head'): q[k][1]+=dy
+    for leg in q['legs'].values():
+        for j in leg: j[1]+=dy
+    for t in q['tail']: t[1]+=dy
+    return q
+HF=[(-1,9.2,0,2.2),(1.5,9.6,2,1.7),(-2.5,9.0,-2,1.6),(0.5,10.4,-0.5,1.4)]
+BATH=lift(mod(SIT,eye='happy',tail=[[-11,4,0],[-15,8,-3],[-17,12,-5],[-15,15,-7]]),1.4)
+BATH['props']=dict(tub=dict(phase=0,headfoam=HF))
+IN_AIR=lift(mod(TUCK,eye='wide',head=[10,22,0],H=[-5,13,0],C=[4,14,0]),5)
+IN_AIR['props']=dict(tub=dict(phase=0))
+SPL=[(-12,13,6),(10,14,7),(-14,16,-2),(12,17,-4),(-4,19,9),(6,18,9),(0,20,-8)]
+A['bath_in']=[IN_AIR,
+  dict(lift(mod(TUCK,eye='closed',head=[10,20,0]),1.6),props=dict(tub=dict(phase=0.5,drops=SPL))),
+  dict(lift(mod(SIT,eye='closed'),1.4),props=dict(tub=dict(phase=1,drops=[(x*1.15,y+3,z*1.1) for x,y,z in SPL]))),
+  dict(copy.deepcopy(BATH),props=dict(tub=dict(phase=1.5,headfoam=HF[:2]))),
+  dict(copy.deepcopy(BATH),props=dict(tub=dict(phase=2,headfoam=HF)))]
+A['bath']=[]
+for i in range(8):
+    p=copy.deepcopy(BATH); s=math.sin(2*math.pi*i/8)
+    p['hroll']=6*s; p['tail'][3][0]+=1.5*s
+    p['props']=dict(tub=dict(phase=i*0.8,headfoam=[(x,y+0.3*math.sin(i+j),z,r) for j,(x,y,z,r) in enumerate(HF)]))
+    if i in (3,4): p['eye']='closed'
+    A['bath'].append(p)
+A['bath_shake']=[]
+for i,r in enumerate([0,-24,24,-22,20,-10,0]):
+    p=copy.deepcopy(BATH); p['hroll']=r; p['eye']='closed'; p['earDown']=0.3 if i%2 else 0
+    drops=[]
+    if 0<i<6:
+        for k in range(8):
+            a=2*math.pi*k/8+i; drops.append((p['head'][0]+math.cos(a)*(9+i*1.5),p['head'][1]+math.sin(a)*(7+i)+2,math.sin(a*1.7)*6))
+    p['props']=dict(tub=dict(phase=i,headfoam=HF[:max(0,4-i)],drops=drops)); A['bath_shake'].append(p)
+OUTSTAND=lift(mod(STAND,eye='open'),1.4)
+A['bath_out']=[]
+for i,P_ in enumerate(trans(mod(BATH,eye='open'),OUTSTAND,3)+[lift(mod(CROUCH,props={},eye='open'),1.4)]):
+    q=copy.deepcopy(P_); q['props']=dict(tub=dict(phase=3+i)); A['bath_out'].append(q)
+FPS.update(eat_start=10,eat_end=10,play_start=12,play_end=12,sad_start=8,sad_end=8,bath_in=10,bath=5,bath_shake=12,bath_out=10)
+LOOP.add('bath')
+NOTE.update(eat_start='stand -> head down into the bowl (bowl in the frames)',eat_end='eating -> stand',
+ play_start='stand -> crouch at the yarn (yarn in the frames)',play_end='crouch -> stand',
+ sad_start='sit -> sad',sad_end='sad -> sit',
+ bath_in='lands in the tub (tub in the frames; play right after a jump)',bath='sitting in the bath, bubbles on its head',
+ bath_shake='shakes the water off, droplets fly',bath_out='stands up in the tub and crouches to jump out (then play jump)')

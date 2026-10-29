@@ -3,9 +3,9 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, and Phase 2b)
-**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`)
+**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations are on branch `room-art` (step 20), not merged yet
 
 ---
 
@@ -23,13 +23,13 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Study | The cat walks to the desk, sits down, puts its glasses on and reads, turning a page every 20–40 s. |
 | No timer running | It wanders around the room, sits for a while, sometimes looks at you, and sometimes curls up for a nap. |
 | Click the cat | It turns to face you, meows (a real meow sound, and a line), then turns back and carries on. |
-| Break mode | The cat closes the book, stands up, walks to the rug, sits and looks at you. Then **Play 🧶** (bats the yarn), **Feed 🐟** (walks to the bowl and eats) and **Bathe 🫧** (hops into the tub, bubbles, a shake, hops out) unlock. |
+| Break mode | The cat closes the book, stands up, walks to the rug, sits and looks at you. Then **Play 🧶** (bats the yarn), **Feed 🐟** (walks to the bowl and eats) and **Bathe 🫧** (jumps into the tub with a splash, bubbles, a shake, jumps out) unlock. Eating and playing go in and out through their own animations. |
 | Sad cat | Switch tabs during study and the cat closes its book and is sad (ears down, a tear). When you come back it says something (depending on the study mode), then goes back to reading. Away for **under 15 s** never counts. |
 | Study modes (2b) | In ⚙️ Settings: **Easy** (like before), **Medium** (2 free trips away per session, then each costs 10% of that session's coins) or **Toxic** (the cat turns its back and roasts you, and each leave costs 5 coins). Picking Toxic asks "Are you sure? The cat will roast you." The server applies the penalties. A card after each session says how long you studied, the coins, and "left N times". |
 | Phones (2b) | The screen stays on while you study (Screen Wake Lock). **📖 Book mode** (touch screens) is for reading on paper: the screen may sleep and that doesn't count as leaving. After a locked phone the timer is still right. |
 | Subjects (2b) | Starting a study session asks "What are you studying?": your last subject is already picked, or add one with a name and a colour. Saved to your account (or this browser when logged out). The subject shows next to the STUDY tag. |
 | Streak calendar (2b) | Tap the 🔥 (or the Today pill): a month view, each day in 4 shades of green by minutes, streak days joined by a flame trail, arrows and swipe to change month, tap a day for its minutes per subject, coins and sessions. The top shows your streak, best streak and this month's hours. |
-| Room progress (2b) | A wall shelf with one book per subject (thicker with more hours), a coin jar that fills with today's coins (sparkles when full), and a plant on the window sill that grows with your streak and droops when it breaks. Placeholder shapes for now, ready for real art. |
+| Room progress (2b) | A wall shelf with one book per subject (thicker with more hours), a coin jar that fills with today's coins (sparkles when full), and a plant on the window sill that grows with your streak and droops when it breaks. Drawn with the sprite pack's room art: books tinted with each subject's colour, 11 jar levels, 5 plant stages and their droopy versions. |
 | Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
 | Voice | "Cat babble" (2b): each line types into the speech bubble while the cat babbles it in quick, soft, high blips, made live with the Web Audio API (happy = higher and bouncy, sad = lower and slower, annoyed = short and sharp). A recording at `public/voice/<line-id>.mp3` plays instead, if there is one. Mute 🔊 in the top bar (in ⚙️ Settings on phones), plus a volume slider in ⚙️ Settings. |
 | Saved minutes | Today's study minutes are shown at the top. Logged in they come from the server; logged out they're saved in `localStorage`, so they survive a reload. |
@@ -374,6 +374,49 @@ Put this in both **Magic Link** and **Confirm signup** (a brand-new account gets
 <p>The code works for an hour. If you didn't ask for it, you can ignore this email.</p>
 ```
 
+### Step 20 — Real room art and the new cat animations · built on branch `room-art` (not merged or deployed yet)
+Files: `public/game/cat/*`, `public/game/room/*`, `tools/cat-generator-hd/*`, `src/game/catAnims.js`, `catBrain.js`, `RoomScene.js`, `roomProgress.js`, `RoomProgressLayer.js`, `layout.js`, `roomArt.js`, `src/lib/calendar.js`, `src/App.jsx`
+- **The pack, version 2** (`study-cat-hd-v2.zip`, deleted after unpacking):
+  - `breeds/`, `outfits/` and `study-cat.json` replaced the ones in `public/game/cat/`. The sheets are now 1280 × 4096: **32 rows** (animations) instead of 22.
+  - `room/` (new) → `public/game/room/`: the shelf, 6 books, 11 jar levels + 4 sparkle frames, 5 plant stages + 4 droopy ones, the tub, and `room.json` (every image's size and origin).
+  - `generator/` (now with `props.py` for the room art) replaced `tools/cat-generator-hd/generator/`. The new previews were added to `tools/cat-generator-hd/previews/`, and the pack's README is `tools/cat-generator-hd/README-v2.md`.
+  - `npm run thumbs` gave exactly the same wardrobe pictures (`sit_front` didn't move).
+- **No row numbers in the code:** the game already made every animation from `start` and `frames` in `study-cat.json`, and so does `make-thumbs.mjs`. I checked that the 22 old animations have the same start, frames and fps as before.
+- **10 new animations in `ANIMS`** (`catAnims.js`), with the start and end postures from the README. Four new postures: `eat`, `play`, `sad` and `tub`, plus two short in-between ones:
+  ```
+  stand ──eat_start──▶ eat  ──eat_end──▶ stand        (same for play_start / play_end)
+  sit   ──sad_start──▶ sad  ──sad_end──▶ sit
+  jump (stopped in the air) ─▶ air ──bath_in──▶ tub ──bath_out──▶ crouch ──jump──▶ stand
+  ```
+  `jump` may now start from `stand` or `crouch`. The route-finder handles that, so `toPosture('stand')` from the tub is `bath_out, jump`.
+- **No more crossfades:** eating, playing and being sad now go in and out through their own transition art. The ghost sprites and `SOFT_JOIN` are gone. Measured on all 5 breeds, the joins into and out of the loops change 0–3 % of the outline (a normal frame is ~3.5 %); before, they were 19–41 %.
+- **Bowl, yarn and tub hide by themselves:** `PROP_ANIMS` in `catAnims.js` lists the animations that draw their own bowl, yarn or tub. Right before every draw, `RoomScene` hides the room's copy while one of those is on screen, even a finished one still showing its last frame. That replaced the old `setProp` / `setTub` / `setBubbles` calls.
+- **The real bath** (as in the README):
+  1. walk next to the tub
+  2. `jump` while moving onto the tub spot
+  3. `bath_in` (lands with a splash)
+  4. `bath` (bubbles on its head), `bath_shake`, `bath` again
+  5. `bath_out` (stands up and crouches)
+  6. `jump` back out
+  - **The tub:** `room/tub.png`, drawn at the tub spot with the cat's scale and origin. It hides while any `bath_*` plays, because those frames have the tub in exactly the same place (checked: 1.8 % different, only the water).
+  - **Two cuts in the jumps, so it doesn't snap:**
+    - The jump frames are crouch, leap, tuck, landing, crouch, stand. `bath_in` starts **in the air**, so the jump in stops after the tuck (`jumpIntoAir`). Without the cut, the cat landed on the floor in front of the tub and then popped back up into the air.
+    - The jump out starts at the leap frame, because `bath_out` already ends crouched.
+  - **Exactly on the spot:** the arc's tween is stopped and the cat is placed exactly on the spot before the next animation shows. In the first test the tween's clock ran one frame behind, so `bath_in`'s tub appeared 2 px off for one frame.
+  - The old particle bubbles, the 1-px shake, and the two-layer drawn tub are gone.
+- **Room progress with the real art** (`roomProgress.js`, `RoomProgressLayer.js`):
+  - Every `art` slot names an image in `room.json`. `RoomScene` loads `room.json` and all its images up front (about 70 kB). Each image is drawn with its own origin, at the cat's scale (0.5), so the sizes match the cat.
+  - **Books:** one per subject, left to right from the shelf's left end (`usableWidthPx`), each one `thicknessPx` + 1 art pixel after the last. The cover is tinted with the subject's colour; the pages go on top, untinted. Neighbouring books share an outline, like in the pack's preview. They stop before the jar when the shelf is full.
+  - **Coin jar:** stands on the shelf's right end and shows the closest of `jar_00` … `jar_10` to today's coins ÷ daily cap. When it's really full (cap reached), the 4 sparkle frames loop on top at 6 fps.
+  - **Plant:** on the window sill, the stage from your streak (0 / 3 / 7 / 14 / 30 days). When the streak broke, it shows the **droopy** version of the stage that streak had reached. That's why App now also passes `lostStreak`: logged in, the server's `current_streak`, which it keeps until you study again; logged out, the last run in `streaksFrom`. A broken 1–2 day streak is still a seed, which has no droopy art.
+  - The placeholder shapes are removed.
+- **Checked with `?debug`** on desktop (1400 × 900) and phone (375 × 812):
+  - all 5 breeds, each with a different outfit (none, beanie, scarf, flowers, bow), in `bath`, `bath_shake`, `eat` and `sad`. The outfit follows every frame and stays behind the tub's rim.
+  - the whole bath frame by frame in slow motion (calico + hoodie).
+  - Feed, Play and Bathe from the real break buttons on the phone.
+  - study → sad → study → break: **0 chain breaks**.
+  - 9 room states: empty, half, full shelf, every droopy stage, and the sparkling jar.
+
 ---
 
 ## 3. Project structure
@@ -385,10 +428,11 @@ study-cat/
 ├─ public/
 │  ├─ favicon.svg           🐱 tab icon
 │  ├─ game/cat/             study-cat.json, breeds/, outfits/ (sheets) + thumbs/ (wardrobe pictures)
+│  ├─ game/room/            room.json + the room art: shelf, books, coin jar, plant stages, tub
 │  ├─ sounds/               the 4 meows (CC0, made by tools/make-meows.mjs)
 │  └─ voice/                recorded lines go here as <line-id>.mp3 (empty for now)
 ├─ tools/
-│  ├─ cat-generator-hd/     the HD pack's Python generator, previews, README (not deployed)
+│  ├─ cat-generator-hd/     the HD pack's Python generator (props.py: room art), previews, READMEs (not deployed)
 │  ├─ make-thumbs.mjs       cuts the wardrobe pictures out of the sheets (npm run thumbs)
 │  ├─ make-meows.mjs        makes public/sounds/*.wav (npm run meows)
 │  └─ db-test.mjs           tests the database migrations in PGlite (npm run test:db)
@@ -418,9 +462,9 @@ study-cat/
       ├─ catBrain.js        ★ the cat's state machine (goals, tasks, scripts)
       ├─ catItems.js        ★ every breed and outfit, with names and (future) locks
       ├─ catLines.js        ★ everything the cat says, each line with a stable id
-      ├─ roomProgress.js    ★ bookshelf / coin jar / plant: stages, thresholds, art slots
-      ├─ RoomProgressLayer.js draws them (placeholder shapes or the configured art)
-      ├─ catAnims.js        each animation's start/end posture, chain route-finder, soft joins
+      ├─ roomProgress.js    ★ bookshelf / coin jar / plant: positions, thresholds, which room.json image
+      ├─ RoomProgressLayer.js draws them with the room art
+      ├─ catAnims.js        each animation's start/end posture, chain route-finder, props drawn in frames
       ├─ layout.js          every spot and prop position (game pixels)
       ├─ roomArt.js         the drawing of the room and props (at 3× resolution)
       ├─ DebugPanel.jsx     the ?debug panel
@@ -579,12 +623,11 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
 - A web page can't tell "screen switched off" from "switched to another app" (Safari gives no way to know). That's why the button and Book mode exist.
 - The leave count is per server session, and Pause → Start begins a new one, so pausing resets the free trips in Medium.
 - On iPhones, the wake lock needs iOS 16.4 or newer. Older ones just let the screen sleep (use Book mode).
-- The bookshelf, coin jar and plant are placeholder shapes until the HD room art arrives (`src/game/roomProgress.js`).
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
-- The sprite pack has no bath animation, so **Bathe** is assembled from jump, sit and a shake.
 - A change of plan waits for the current move to finish (up to about 2 s for a long loop like `read`), on purpose, so the cat never snaps.
-- Phaser adds about 320 kB (gzipped) to download, plus ~0.5 MB for a breed sheet and ~0.15 MB for an outfit. They load after the page, but the very first visit shows an empty room for a moment, and picking a new breed or outfit takes a moment the first time.
-- `eat`, `play` and `sad` have no in/out transition art in the pack, so those joins are a quick crossfade rather than real motion.
+- Phaser adds about 320 kB (gzipped) to download, plus ~0.6–0.8 MB for a breed sheet, ~0.05–0.35 MB for an outfit, and ~70 kB of room art. They load after the page, but the very first visit shows an empty room for a moment, and picking a new breed or outfit takes a moment the first time.
+- The room's own bowl and yarn are still simple drawings (`roomArt.js`). The pack draws an HD bowl and yarn inside the eat and play frames, so you can see the swap when the cat starts eating or playing. They're in the same place, but the style differs.
+- Each breed sheet is now 1280 × 4096, about 21 MB of graphics memory once decoded (it was 14 MB). Only the breed and outfit in use are loaded, but 4096 px is also the largest texture some older phones accept.
 - The window's hills and a few room details are still drawn from small rectangles, so up close they have little steps.
 - When locks become real, a saved breed or outfit that's locked will need a fallback (e.g. orange with no outfit). Today nothing is locked, so that can't happen yet.
 - After regenerating the sprite pack, run `npm run thumbs`, or the wardrobe pictures will be out of date.
@@ -611,7 +654,9 @@ Example: "when the break starts, sometimes nap on the rug instead".
 
 **A new breed or outfit:** add it in the generator (`tools/cat-generator-hd/generator/cat_hd.py`, `make.py`), run `python make.py`, and copy its sheet and the new `study-cat.json` into `public/game/cat/`. The game reads the lists from the JSON, so no code changes are needed.
 
-If a new sprite animation is added to the pack, add one line to `ANIMS` in `catAnims.js` saying which posture it starts and ends in. The route-finder then knows how to reach it.
+If a new sprite animation is added to the pack, add one line to `ANIMS` in `catAnims.js` saying which posture it starts and ends in (`from` can be a list). The route-finder then knows how to reach it. If its frames draw a room prop (like the bowl), add it to `PROP_ANIMS` so the room's copy hides while it plays.
+
+**New room art:** add it in `tools/cat-generator-hd/generator/props.py`, copy the image and the new `room.json` into `public/game/room/`, and name it in `roomProgress.js`. It's drawn with its origin from `room.json`, at the cat's scale.
 
 ---
 

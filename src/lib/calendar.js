@@ -57,5 +57,6 @@ export function streaksFrom(minutesByDay, minMinutes, today = localDay()) {
   }
   // the current streak is alive if its last day is today or yesterday
   const current = prev && prev >= addDays(today, -1) ? run : 0
-  return { current, best }
+  // last: how long the latest streak was (the one that broke, when current is 0)
+  return { current, best, last: run }
 }

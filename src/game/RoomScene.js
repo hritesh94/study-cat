@@ -1,15 +1,15 @@
 import Phaser from 'phaser'
 import { CatBrain } from './catBrain'
-import { animKey, baseName } from './catAnims'
+import { PROP_ANIMS, animKey, baseName } from './catAnims'
 import { BOWL_POS, C, drawProps, drawRoom, RES, ROOM_TEX, YARN_POS } from './roomArt'
 import { CAT_SCALE, FEET_Y, HEAD_TOP, LAMP, MUG, ROOM_W, SPOTS, VIEW_BOTTOM } from './layout'
-import { RoomProgressLayer } from './RoomProgressLayer'
+import { RoomProgressLayer, roomKey } from './RoomProgressLayer'
 
-const DEPTH = { room: 0, leaves: 1, props: 2, light: 8, glow: 9, cat: 10, ghost: 12, front: 20 }
+const DEPTH = { room: 0, leaves: 1, props: 2, light: 8, glow: 9, cat: 10 }
 const BASE = 'game/cat/'
+const ROOM_BASE = 'game/' // room.json's files are "room/…"
 const MAX_ZOOM = 3 // 64 game px × 3 = 192 screen px = the HD art at 1.5×
 const MIN_VIEW_W = 130 // on phones, always show at least this much room across
-const FADE_MS = 240 // crossfade for joins the pack has no transition art for
 
 const catKey = (breed) => `cat-${breed}`
 const outfitKey = (outfit) => `outfit-${outfit}`
@@ -36,6 +36,12 @@ export class RoomScene extends Phaser.Scene {
       this.look = this.validLook(look)
       this.queueSheets(this.look)
     })
+    // the room art (shelf, books, jar, plant, tub): small, so all of it now
+    this.load.json('roomMeta', `${ROOM_BASE}room/room.json`)
+    this.load.once('filecomplete-json-roomMeta', (key, type, roomMeta) => {
+      this.roomMeta = roomMeta
+      for (const [name, item] of Object.entries(roomMeta.items)) this.load.image(roomKey(name), ROOM_BASE + item.file)
+    })
   }
 
   create() {
@@ -56,27 +62,18 @@ export class RoomScene extends Phaser.Scene {
       bowl: art(BOWL_POS.x, BOWL_POS.y, 'bowl').setOrigin(0.5, 1).setDepth(DEPTH.props),
       yarn: art(YARN_POS.x, YARN_POS.y, 'yarn').setOrigin(0.5, 1).setDepth(DEPTH.props),
     }
-    art(SPOTS.tub, FEET_Y - 3, 'tubBack').setDepth(DEPTH.props)
-    this.tubFront = art(SPOTS.tub, FEET_Y - 2, 'tubFront').setOrigin(0.5, 0).setDepth(DEPTH.props)
+    // the tub: same frame size and origin as the cat, on the tub spot, so the
+    // tub drawn inside the bath_* frames lands exactly on it
+    const tub = this.roomMeta.items.tub
+    this.props.tub = this.add.image(SPOTS.tub, FEET_Y, roomKey('tub')).setOrigin(tub.origin.x, tub.origin.y)
+    this.props.tub.setScale(CAT_SCALE).setDepth(DEPTH.props)
 
     // bookshelf, coin jar and plant (see roomProgress.js)
-    this.progress = new RoomProgressLayer(this, DEPTH.props)
+    this.progress = new RoomProgressLayer(this, DEPTH.props, this.roomMeta)
 
     this.makeWindowLife()
     this.makeSteam()
     this.makeLighting()
-    this.bubbles = this.add.particles(0, 0, 'bubble', {
-      x: { min: SPOTS.tub - 14, max: SPOTS.tub + 14 },
-      y: FEET_Y - 2,
-      speedY: { min: -18, max: -8 },
-      speedX: { min: -4, max: 4 },
-      lifespan: 1400,
-      scale: { start: 0.6 / RES, end: 1 / RES },
-      alpha: { start: 1, end: 0 },
-      frequency: 140,
-      emitting: false,
-    })
-    this.bubbles.setDepth(DEPTH.front + 1)
 
     // the cat — feet on the origin, as the pack's README says
     const o = meta.origin
@@ -86,29 +83,23 @@ export class RoomScene extends Phaser.Scene {
     this.cat.on('pointerdown', () => this.brain.poke())
     // the outfit: a second sprite glued on top of the cat (see syncOutfit)
     this.outfit = sprite(catKey(this.look.breed)).setVisible(false)
-    // "ghosts" of the last frame, faded out to soften joins without transition art
-    this.ghost = sprite(catKey(this.look.breed)).setVisible(false).setDepth(DEPTH.ghost)
-    this.ghostOutfit = sprite(catKey(this.look.breed)).setVisible(false).setDepth(DEPTH.ghost + 1)
     this.applyOutfit(this.look.outfit)
 
     this.brain = new CatBrain(this, this.cat, {
       key: (name) => animKey(this.look.breed, name),
       info: (name) => meta.animations[name],
-      crossfade: () => this.crossfade(),
       onBusy: (busy) => this.bridge.onBusy?.(busy),
       onMeow: () => this.bridge.onMeow?.(),
       onChange: (state) =>
         this.bridge.onState?.({ ...state, ...this.look, breeds: Object.keys(meta.breeds), outfits: Object.keys(meta.outfits) }),
-      setProp: (name, visible) => this.props[name].setVisible(visible),
-      setTub: (inTub) => this.tubFront.setDepth(inTub ? DEPTH.front : DEPTH.props),
-      setBubbles: (on) => (on ? this.bubbles.start() : this.bubbles.stop()),
     })
 
     // Glue the outfit to the cat right before every draw (after all game
-    // logic has run, so it can never be a frame behind).
-    this.game.events.on('prerender', this.syncOutfit, this)
+    // logic has run, so it can never be a frame behind), and hide the room's
+    // bowl / yarn / tub while the frames on screen have their own.
+    this.game.events.on('prerender', this.syncCat, this)
     this.events.once('destroy', () => {
-      this.game.events.off('prerender', this.syncOutfit, this)
+      this.game.events.off('prerender', this.syncCat, this)
       this.brain.destroy()
     })
     this.scale.on('resize', () => this.layoutCamera(true))
@@ -177,40 +168,18 @@ export class RoomScene extends Phaser.Scene {
     if (outfit) this.outfit.setTexture(outfitKey(outfit), this.cat.frame.name)
     this.outfit.setVisible(!!outfit)
   }
-  // As in the pack's README: same position, flip, frame number, one layer up.
-  syncOutfit() {
-    for (const [base, top] of [
-      [this.cat, this.outfit],
-      [this.ghost, this.ghostOutfit],
-    ]) {
-      if (!top.visible) continue
-      top.setPosition(base.x, base.y)
-      top.setFlipX(base.flipX)
-      top.setFrame(base.frame.name)
-      top.setDepth(base.depth + 1)
-      top.setAlpha(base.alpha)
+  syncCat() {
+    // As in the pack's README: same position, flip, frame number, one layer up.
+    const { cat, outfit } = this
+    if (outfit.visible) {
+      outfit.setPosition(cat.x, cat.y)
+      outfit.setFlipX(cat.flipX)
+      outfit.setFrame(cat.frame.name)
+      outfit.setDepth(cat.depth + 1)
     }
-  }
-
-  // Freeze the current frame in a ghost on top and fade it out, while the
-  // real cat already plays the next animation underneath.
-  crossfade() {
-    const { cat, ghost, ghostOutfit } = this
-    this.tweens.killTweensOf(ghost)
-    ghost.setTexture(cat.texture.key, cat.frame.name).setPosition(cat.x, cat.y).setFlipX(cat.flipX)
-    ghost.setAlpha(1).setVisible(true)
-    ghostOutfit.setVisible(this.outfit.visible)
-    if (this.outfit.visible) ghostOutfit.setTexture(this.outfit.texture.key)
-    this.tweens.add({
-      targets: ghost,
-      alpha: 0,
-      duration: FADE_MS,
-      ease: 'Sine.easeOut',
-      onComplete: () => {
-        ghost.setVisible(false)
-        ghostOutfit.setVisible(false)
-      },
-    })
+    // the frame on screen (a finished animation keeps showing its last one)
+    const shown = cat.anims.currentAnim ? baseName(cat.anims.currentAnim.key) : null
+    for (const [prop, anims] of Object.entries(PROP_ANIMS)) this.props[prop].setVisible(!anims.includes(shown))
   }
 
   // ── camera: floor kept above the timer panel, cat at most 1.5× its art ──
@@ -316,7 +285,6 @@ export class RoomScene extends Phaser.Scene {
     this.anims.globalTimeScale = s
     this.tweens.timeScale = s
     this.time.timeScale = s
-    this.bubbles.timeScale = s
   }
 
   update() {

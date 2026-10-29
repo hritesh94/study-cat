@@ -23,10 +23,9 @@ export const SPOTS = {
   bowl: 96,
   play: 140,
   tubEntry: 26, // stands here, then jumps into the tub
-  tub: 56,
+  tub: 56, // the tub (public/game/room/tub.png) stands here, on the floor line
   tubExit: 92,
 }
-export const TUB_FEET_Y = 154
 export const WANDER = [24, 300]
 
 // The low desk: its top sits exactly where the sprite's book is (frame y 84).
@@ -36,7 +35,7 @@ export const MUG = { x: 272, y: 131 }
 
 // How far above the feet the top of the head is, per posture
 // (used to put the speech bubble above the cat).
-export const HEAD_TOP = { stand: 43, sit: 48, front: 45, read: 44, sleep: 35 }
+export const HEAD_TOP = { stand: 43, sit: 48, front: 45, read: 44, sleep: 35, eat: 43, play: 43, sad: 44, tub: 50, air: 50, crouch: 45 }
 
 // The camera keeps this world row just above the timer panel.
 export const VIEW_BOTTOM = 164

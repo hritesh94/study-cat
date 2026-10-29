@@ -7,7 +7,10 @@ BASE=dict(
  book=[(166,140,196),(144,118,176),(116,92,148)], page=[(255,251,240),(246,236,216),(222,208,188)],
  bowl=[(166,198,160),(144,178,140),(116,150,118)], food=[(200,122,78),(178,102,64),(150,84,54)],
  yarn=[(176,152,210),(154,130,190),(126,104,164)], yarnd=[(140,116,176),(122,98,158),(100,80,136)],
- tear=[(160,212,248)]*3, blush=[(250,170,170),(240,150,154),(220,132,140)], glass=[(72,50,56)]*3, hl=[(255,255,255)]*3,
+ tear=[(160,212,248)]*3,
+ wood=[(214,160,112),(190,136,92),(156,106,72)], woodd=[(176,124,84),(156,106,70),(126,84,58)],
+ hoop=[(150,150,166),(124,124,142),(98,98,116)], water=[(178,222,246),(152,204,236),(124,180,220)],
+ foam=[(255,255,255),(240,246,252),(212,224,238)], drop=[(170,216,246)]*3, blush=[(250,170,170),(240,150,154),(220,132,140)], glass=[(72,50,56)]*3, hl=[(255,255,255)]*3,
  # outfits
  beanie=[(232,96,92),(212,76,78),(178,58,66)], beanie2=[(214,80,80),(194,64,68),(162,48,58)],
  knit=[(255,246,236),(240,226,214),(214,196,186)],
@@ -91,6 +94,22 @@ def build(P,outfit=None):
         bx,by,bz=pp['bowl']; pr.append(ell([bx,by,bz],[5.6,2.6,5.6],mat='bowl')); pr.append(ell([bx,by+2.1,bz],[4.4,1.0,4.4],mat='food'))
     if pp.get('yarn'):
         x,y,z,spin=pp['yarn']; pr.append(ell([x,y,z],[3.6]*3,mat='yarn',tag='yarn',spin=spin))
+    if pp.get('tub'):
+        tb=pp['tub']; c0=np.array([-1.0,0,0])
+        pr.append(cyl(c0+[0,4.8,0],12.5,10.5,4.8,mat='wood',tag='tub',hollow=True))
+        pr.append(cyl(c0+[0,0.7,0],12.4,10.4,0.7,mat='woodd'))
+        for yy in (2.2,7.6):
+            pr.append(cyl(c0+[0,yy,0],12.9,10.9,0.55,mat='hoop',hollow=True))
+        pr.append(cyl(c0+[0,7.4,0],12.2,10.2,0.35,mat='water'))
+        rng=np.random.RandomState(7); ph=tb.get('phase',0)
+        for k in range(26):
+            a=rng.rand()*2*np.pi; rr=6+rng.rand()*5
+            x=c0[0]+rr*np.cos(a); z=rr*0.85*np.sin(a); s_=1.1+rng.rand()*1.3
+            pr.append(ell([x,7.9+0.4*np.sin(ph+k),z],[s_]*3,mat='foam'))
+        for k,(x,y,z,s_) in enumerate(tb.get('headfoam',[])):
+            pr.append(ell(H([x,y,z]),[s_]*3,mat='foam'))
+        for (x,y,z) in tb.get('drops',[]):
+            pr.append(ell([x,y,z],[0.7,1.0,0.7],mat='drop'))
     if pp.get('tear') is not None:
         t=pp['tear']; pr.append(ell(H([8.2,-1.2-3.0*t,4.6]),[0.7,1.0,0.7],mat='tear'))
     # ---------- outfits ----------
@@ -160,6 +179,8 @@ def roles(p,q,nq,n,ndl,breed):
         r[frac(qn[:,1]*7)<0.35]='beanie2'
     elif tag=='hood_body':
         r[frac(q[:,0]*1.5+0.2)<0.18]='hoodie2'
+    elif tag=='tub':
+        r[frac(np.arctan2(q[:,2],q[:,0])/(2*np.pi)*14)<0.12]='woodd'
     # breed patterns
     if B.get('patches') and tag in ('hips','chest','head','tail','leg','ear') and tag!='muzzle':
         seed={'hips':1.3,'chest':2.1,'head':0.7,'tail':3.3,'leg':4.1,'ear':0.7}[tag]

@@ -1,5 +1,5 @@
-import { ANIMS, RESTING, SOFT_JOIN, baseName, path } from './catAnims'
-import { FEET_Y, SPOTS, TUB_FEET_Y, WALK_SPEED, WANDER } from './layout'
+import { ANIMS, JUMP_AIR_FRAME, RESTING, baseName, path, startsFrom } from './catAnims'
+import { FEET_Y, SPOTS, WALK_SPEED, WANDER } from './layout'
 
 const rand = (a, b) => a + Math.random() * (b - a)
 
@@ -27,7 +27,7 @@ export class CatBrain {
   constructor(scene, sprite, hooks) {
     this.scene = scene
     this.cat = sprite
-    this.hooks = hooks // { onBusy, onMeow, onChange, setTub, setBubbles, setProp }
+    this.hooks = hooks // { key, info, onBusy, onMeow, onChange }
     this.posture = 'stand'
     this.facing = 'right'
     this.anim = null
@@ -85,7 +85,7 @@ export class CatBrain {
     const info = ANIMS[name]
     this.anim = name
     this.cat.play(this.hooks.key(name))
-    this.posture = info.from
+    this.posture = startsFrom(name)[0]
     this.emit()
     if (!info.loop) {
       const event = 'animationcomplete'
@@ -149,25 +149,23 @@ export class CatBrain {
 
   // Start an animation. Complains (and counts) if it breaks the chain.
   // While debug has paused the brain, scripts can't start anything.
-  start(name, force = false) {
+  start(name, force = false, startFrame = 0) {
     if (this.paused && !force) return false
-    const info = ANIMS[name]
-    if (info.from !== this.posture) {
+    if (!startsFrom(name).includes(this.posture)) {
       this.violations++
       console.warn(`[cat] ${name} can't start from "${this.posture}"`)
     }
-    // no transition art for this join? blend it instead of cutting
-    if (this.anim && this.anim !== name && (SOFT_JOIN.has(name) || SOFT_JOIN.has(this.anim))) this.hooks.crossfade?.()
     this.anim = name
     this.history.push(name)
     if (this.history.length > 60) this.history.shift()
-    this.cat.play(this.hooks.key(name))
+    this.cat.play({ key: this.hooks.key(name), startFrame })
     this.emit()
     return true
   }
   // Show the resting loop for the current posture (idle, sit_idle, read…).
+  // 'air' and 'crouch' have none: the last frame stays until the next move.
   rest(force = false) {
-    this.start(RESTING[this.posture], force)
+    if (RESTING[this.posture]) this.start(RESTING[this.posture], force)
   }
   flip() {
     this.facing = this.facing === 'right' ? 'left' : 'right'
@@ -177,7 +175,8 @@ export class CatBrain {
   // A one-shot animation, played to its last frame. The very same moment it
   // ends we update the posture (and flip after turn_around) and start the
   // resting loop, so there's never a frame of the wrong pose.
-  once(name) {
+  // `startFrame` skips the first frames (jumping out of the tub).
+  once(name, startFrame = 0) {
     return new Promise((resolve) => {
       const done = () => {
         this.pending.delete(cancel)
@@ -200,7 +199,7 @@ export class CatBrain {
       }
       this.pending.add(cancel)
       this.cat.on('animationcomplete', onComplete)
-      if (!this.start(name)) cancel()
+      if (!this.start(name, false, startFrame)) cancel()
     })
   }
 
@@ -287,24 +286,62 @@ export class CatBrain {
     await this.turnToFace(facing, v)
   }
 
-  // The jump animation is drawn in place; we move the sprite during the leap frames.
-  async jumpTo(x, y) {
+  // The jump animation is drawn in place; we move the sprite along an arc
+  // while it's in the air. Its frames: crouch, leap, tuck, landing, crouch,
+  // stand.
+  //   intoTub     stop after the tuck, still in the air (posture 'air'), so
+  //               bath_in does the landing, in the water
+  //   fromCrouch  skip the first crouch: bath_out already ends crouched
+  async jumpTo(x, y, { intoTub = false, fromCrouch = false } = {}) {
     const frame = 1000 / this.hooks.info('jump').fps
+    const first = fromCrouch ? 1 : 0
+    // move from the leap until the landing (or until the tuck ends)
+    const moveFrom = Math.max(0, 1.5 - first)
+    const moveTo = (intoTub ? JUMP_AIR_FRAME + 1 : 4.5) - first
     const fromX = this.cat.x
     const fromY = this.cat.y
-    this.scene.tweens.addCounter({
+    const move = this.scene.tweens.addCounter({
       from: 0,
       to: 1,
-      delay: frame * 1.5,
-      duration: frame * 3,
+      delay: frame * moveFrom,
+      duration: frame * (moveTo - moveFrom),
       onUpdate: (tw) => {
         const t = tw.getValue()
         this.cat.x = fromX + (x - fromX) * t
         this.cat.y = fromY + (y - fromY) * t - Math.sin(Math.PI * t) * 12
       },
     })
-    await this.once('jump')
+    if (intoTub) await this.jumpIntoAir(frame)
+    else await this.once('jump', first)
+    // exactly on the spot before the next animation shows (bath_in's tub
+    // must land on the room's tub), even if the clock ran a little behind
+    move.stop()
     this.cat.setPosition(x, y)
+  }
+
+  // Play the jump up to the tuck frame, show that frame for its full time,
+  // and stop there: the cat is still in the air (above the tub).
+  jumpIntoAir(frame) {
+    return new Promise((resolve) => {
+      let timer = null
+      const onUpdate = (anim, f) => {
+        if (baseName(anim.key) !== 'jump' || f.index - 1 !== JUMP_AIR_FRAME) return
+        this.cat.off('animationupdate', onUpdate)
+        this.cat.anims.pause()
+        timer = this.scene.time.delayedCall(frame, done)
+      }
+      const done = () => {
+        this.cat.off('animationupdate', onUpdate)
+        timer?.remove()
+        this.pending.delete(done)
+        this.posture = 'air'
+        this.emit()
+        resolve()
+      }
+      this.pending.add(done)
+      this.cat.on('animationupdate', onUpdate)
+      if (!this.start('jump')) done()
+    })
   }
 
   // ── the main loop ──
@@ -412,7 +449,7 @@ export class CatBrain {
 
     // you switched tabs: close the book and be sad (study resumes reading after)
     async sad(v) {
-      await this.toPosture('sit', v)
+      await this.toPosture('sad', v) // read_end, sad_start
       if (this.stale(v)) return
       await this.hold('sad', Infinity, v)
     },
@@ -443,46 +480,43 @@ export class CatBrain {
       }
     },
 
-    // Feed: walk to the bowl and eat
+    // Feed: walk to the bowl, head down into it (eat_start), eat, head back
+    // up (eat_end). The room hides its own bowl while those play (RoomScene).
+    // Once eating, it always lifts its head before doing anything else.
     async feed(v) {
       await this.goTo(SPOTS.bowl, 'right', v)
       if (this.stale(v)) return
-      await this.toPosture('stand', v)
-      this.hooks.setProp?.('bowl', false) // the eat animation draws its own bowl
+      await this.toPosture('eat', v)
       await this.hold('eat', 5, v)
-      this.hooks.setProp?.('bowl', true)
+      await this.toPosture('stand')
     },
 
-    // Play: bat the yarn on the rug
+    // Play: crouch at the yarn on the rug (play_start), bat it, stand (play_end)
     async play(v) {
       await this.goTo(SPOTS.play, 'right', v)
       if (this.stale(v)) return
-      await this.toPosture('stand', v)
-      this.hooks.setProp?.('yarn', false) // the play animation draws its own yarn
+      await this.toPosture('play', v)
       await this.hold('play', 4, v)
-      this.hooks.setProp?.('yarn', true)
+      await this.toPosture('stand')
     },
 
-    // Bathe (the pack has no bath animation, so it's built from pieces):
-    // hop into the tub, sit in the bubbles, give a shake, hop out.
-    // Once in the tub it always finishes, so the cat can't get stuck in it.
+    // Bathe, as in the pack's README: from next to the tub, jump onto the
+    // tub spot, bath_in (lands with a splash), bath (bubbles), bath_shake,
+    // bath, bath_out (stands up and crouches), then jump back out. The room's
+    // tub hides while the bath_* animations play (RoomScene), because their
+    // frames have the tub in exactly the same place. Once in the tub it
+    // always finishes, so the cat can't get stuck in it.
     async bathe(v) {
       await this.goTo(SPOTS.tubEntry, 'right', v)
       if (this.stale(v)) return
       await this.toPosture('stand', v)
-      await this.jumpTo(SPOTS.tub, TUB_FEET_Y)
-      this.hooks.setTub?.(true)
-      await this.once('sit_down')
-      this.hooks.setBubbles?.(true)
-      await this.hold('sit_idle', 1.5, null)
-      const shake = this.scene.tweens.add({ targets: this.cat, x: this.cat.x + 1, duration: 60, yoyo: true, repeat: 9 })
-      await this.hold('sit_idle', 1.6, null)
-      shake.stop()
-      this.cat.x = SPOTS.tub
-      this.hooks.setBubbles?.(false)
-      await this.once('stand_up')
-      await this.jumpTo(SPOTS.tubExit, FEET_Y)
-      this.hooks.setTub?.(false)
+      await this.jumpTo(SPOTS.tub, FEET_Y, { intoTub: true })
+      await this.once('bath_in')
+      await this.hold('bath', 2, null)
+      await this.once('bath_shake')
+      await this.hold('bath', 1.5, null)
+      await this.once('bath_out')
+      await this.jumpTo(SPOTS.tubExit, FEET_Y, { fromCrouch: true })
     },
   }
 }
