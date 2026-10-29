@@ -1,15 +1,24 @@
 :root {
-  --bg: #1d1b2e;
-  --bg-focus: #11101b;
-  --panel: rgba(255, 255, 255, 0.08);
-  --text: #f4efe6;
-  --muted: #b9b2c9;
-  --accent: #f5a65b;
-  --break: #7fd1b9;
+  /* cozy storybook palette */
+  --ink: #4b3b47; /* soft dark outline + text */
+  --ink-soft: rgba(75, 59, 71, 0.22);
+  --cream: #fbf1de;
+  --paper: #fffaf0;
+  --wall: #f6e9d3;
+  --orange: #f2a66a;
+  --orange-dark: #d98a52;
+  --sage: #9cb59a;
+  --sage-light: #c9d8c1;
+  --purple: #9a86b0;
+  --muted: #7a6873;
 
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  color: var(--text);
-  background: var(--bg);
+  /* "hand-drawn" wobbly corners: each corner gets a slightly different curve */
+  --wobbly: 255px 18px 225px 18px / 18px 225px 18px 255px;
+  --wobbly-card: 30px 38px 28px 42px / 38px 28px 42px 30px;
+
+  font-family: 'Fredoka', 'Nunito', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--wall);
 }
 
 * {
@@ -25,32 +34,57 @@ body,
 
 button {
   font: inherit;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  padding: 0.55rem 1.2rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--wobbly);
+  padding: 0.45rem 1.15rem;
   cursor: pointer;
+  box-shadow: 2px 3px 0 var(--ink);
+  transition: transform 0.12s, box-shadow 0.12s, background-color 0.2s;
 }
 
 button:hover {
-  background: rgba(255, 255, 255, 0.16);
+  transform: translate(-1px, -2px) rotate(-1deg);
+  box-shadow: 3px 5px 0 var(--ink);
+}
+
+/* pressing a button squashes it into the page */
+button:active {
+  transform: translate(2px, 3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px dashed var(--purple);
+  outline-offset: 3px;
 }
 
 button.primary {
-  background: var(--accent);
-  color: #2a1a0b;
-  border-color: transparent;
+  background: var(--orange);
   font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+  box-shadow: 2px 3px 0 var(--ink);
 }
 
 input {
   font: inherit;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  padding: 0.3rem 0.4rem;
-  width: 4.5rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 12px 16px 10px 14px / 14px 10px 16px 12px;
+  padding: 0.2rem 0.4rem;
+  width: 4.2rem;
   text-align: center;
+}
+
+input:disabled {
+  opacity: 0.6;
 }

@@ -423,6 +423,22 @@
   }
 }
 
+/* Phones: smaller window, plant tucked in the corner, no picture frame. */
+@media (max-width: 720px) {
+  .room-window {
+    left: 4vw;
+    height: 27vh;
+  }
+  .room-picture {
+    display: none;
+  }
+  .room-plant {
+    left: 1vw;
+    height: 19vh;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .leaf-fall,
   .leaf-sway {

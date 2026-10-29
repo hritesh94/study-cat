@@ -1,16 +1,4 @@
 .app {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-  background: radial-gradient(circle at 50% 40%, #35304f, var(--bg) 70%);
-  transition: background 0.8s;
-}
-
-.app.break {
-  background: radial-gradient(circle at 50% 40%, #2f5249, #18282a 70%);
-}
-
-.app {
   /* shared layout: the room, cat and speech bubble all line up from these */
   --floor: 40vh;
   --cat-size: min(42vh, 380px);
@@ -18,6 +6,32 @@
   --desk-w: clamp(240px, 28vw, 440px);
   --desk-right: 4vw;
   --desk-bottom: calc(var(--floor) - 4vh);
+
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--wall);
+}
+
+/* Phones: taller floor (the panel is taller), smaller cat, desk peeks in from the right. */
+@media (max-width: 720px) {
+  .app {
+    --floor: 46vh;
+    --cat-size: min(34vh, 300px, 84vw);
+    --cat-bottom: calc(var(--floor) - 6vh);
+    --desk-w: 220px;
+    --desk-right: -70px;
+  }
+  .panel {
+    gap: 0.5rem;
+    padding: 0.8rem 1rem 1rem;
+  }
+  .time {
+    font-size: 3rem;
+  }
+  .settings input {
+    width: 3.2rem;
+  }
 }
 
 .cat-stage {
@@ -30,143 +44,185 @@
   z-index: 1;
 }
 
-/* ── Focus view: while studying, hide everything except the cat and the time ── */
-.app.focus {
-  background: radial-gradient(circle at 50% 40%, #241f36, var(--bg-focus) 70%);
-}
-
-.app.focus .topbar,
-.app.focus .settings,
-.app.focus .controls button:not(:first-child) {
-  display: none;
-}
-
-.app.focus .panel {
-  background: transparent;
-  backdrop-filter: none;
-  opacity: 0.55;
-  transition: opacity 0.3s;
-}
-
-.app.focus .panel:hover {
-  opacity: 1;
-}
-
+/* ── top bar ── */
 .topbar {
   position: absolute;
   inset: 0 0 auto 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
+  padding: 0.9rem 1.1rem;
   z-index: 2;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  /* a cream "sticker" edge so the title reads on any background */
+  text-shadow:
+    2px 2px 0 var(--cream),
+    -2px 2px 0 var(--cream),
+    2px -2px 0 var(--cream),
+    -2px -2px 0 var(--cream);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .today {
-  color: var(--muted);
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--wobbly);
+  padding: 0.25rem 0.8rem;
+  font-weight: 500;
+  box-shadow: 2px 3px 0 var(--ink-soft);
+  transform: rotate(1.5deg);
 }
 
 button.icon {
-  padding: 0.35rem 0.6rem;
+  padding: 0.3rem 0.55rem;
+  line-height: 1;
 }
 
-/* ── Speech bubble above the cat ── */
+/* ── speech bubble above the cat ── */
 .bubble {
   position: absolute;
   left: 50%;
-  top: 12%;
+  bottom: calc(var(--cat-bottom) + var(--cat-size) * 0.98);
   transform: translateX(-50%);
-  max-width: calc(100% - 32px);
-  padding: 0.7rem 1.1rem;
-  background: #fffaf0;
-  color: #2a1f33;
-  font-weight: 600;
-  border-radius: 18px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  max-width: min(420px, calc(100% - 32px));
+  width: max-content;
+  padding: 0.45rem 1.2rem 0.55rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Patrick Hand', 'Fredoka', cursive;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  text-align: center;
+  border: 3px solid var(--ink);
+  border-radius: 26px 32px 24px 34px / 32px 24px 34px 26px;
+  box-shadow: 3px 4px 0 var(--ink-soft);
   z-index: 3;
-  animation: pop 0.25s ease-out;
+  animation: pop 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 
-/* the little tail pointing down at the cat */
+/* the tail: an ink triangle with a smaller paper triangle on top */
+.bubble::before,
 .bubble::after {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -9px;
-  margin-left: -9px;
-  border: 9px solid transparent;
+  border-style: solid;
   border-bottom: 0;
-  border-top-color: #fffaf0;
+}
+.bubble::before {
+  bottom: -17px;
+  margin-left: -13px;
+  border-width: 17px 13px 0;
+  border-color: var(--ink) transparent transparent;
+}
+.bubble::after {
+  bottom: -11px;
+  margin-left: -9px;
+  border-width: 12px 9px 0;
+  border-color: var(--paper) transparent transparent;
 }
 
 @keyframes pop {
   from {
-    transform: translateX(-50%) scale(0.8);
+    transform: translateX(-50%) scale(0.7) rotate(-4deg);
     opacity: 0;
   }
 }
 
-.break-actions {
-  display: flex;
-  gap: 0.6rem;
-}
-
-.break-actions button {
-  background: var(--break);
-  color: #0f2a24;
-  border-color: transparent;
-  font-weight: 600;
-}
-
-.break-actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
+/* ── timer panel ── */
 .panel {
   position: absolute;
-  left: 50%;
-  bottom: 1.5rem;
-  transform: translateX(-50%);
-  width: min(420px, calc(100% - 32px));
+  /* left+right 0 with auto margins centers it without squeezing its width */
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  bottom: 1.2rem;
+  width: min(440px, calc(100% - 32px));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem 1.25rem;
-  background: var(--panel);
-  border-radius: 20px;
-  backdrop-filter: blur(8px);
+  gap: 0.65rem;
+  padding: 0.9rem 1.25rem 1.1rem;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: var(--wobbly-card);
+  box-shadow: 5px 7px 0 var(--ink-soft);
+  /* stitched edge, like a cozy patch */
+  outline: 2px dashed rgba(75, 59, 71, 0.25);
+  outline-offset: -10px;
   z-index: 2;
+  transition: background-color 0.6s, opacity 0.3s;
+}
+
+/* Wide screens: time on the left, buttons on the right — keeps the panel short. */
+@media (min-width: 721px) {
+  .panel {
+    width: fit-content;
+    max-width: calc(100% - 32px);
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1.6rem;
+    row-gap: 0.6rem;
+    align-items: center;
+    justify-items: center;
+    padding: 1rem 1.6rem 1.1rem;
+  }
+  .phase {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+  }
+  .time {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+  }
+  .break-actions,
+  .controls,
+  .settings {
+    grid-column: 2;
+  }
 }
 
 .phase {
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
   font-size: 0.8rem;
-  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.75rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--wobbly);
+  background: var(--orange);
+  transform: rotate(-2deg);
+}
+
+.app.break .phase {
+  background: var(--sage);
 }
 
 .time {
-  font-size: 3.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-size: 3.4rem;
+  font-weight: 600;
   line-height: 1;
+  min-width: 5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .controls,
-.settings {
+.settings,
+.break-actions {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
@@ -176,6 +232,47 @@ button.icon {
 .settings label {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   color: var(--muted);
+  font-weight: 500;
+}
+
+.break-actions button {
+  background: var(--sage-light);
+  font-weight: 600;
+}
+
+.break-actions button:nth-child(1) {
+  transform: rotate(-1.5deg);
+}
+.break-actions button:nth-child(3) {
+  transform: rotate(1.5deg);
+}
+.break-actions button:hover:not(:disabled) {
+  background: var(--sage);
+  transform: translate(-1px, -2px) rotate(-2deg);
+}
+.break-actions button:active:not(:disabled) {
+  transform: translate(2px, 3px);
+}
+
+/* ── Focus view: while studying, hide everything except the cat and the time ── */
+.app.focus .topbar,
+.app.focus .settings,
+.app.focus .controls button:not(:first-child) {
+  display: none;
+}
+
+.app.focus .panel > * {
+  align-self: center;
+}
+
+.app.focus .panel {
+  display: flex;
+  background: rgba(251, 241, 222, 0.82);
+  opacity: 0.85;
+}
+
+.app.focus .panel:hover {
+  opacity: 1;
 }
