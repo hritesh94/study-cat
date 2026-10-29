@@ -2,7 +2,8 @@ import { CoinIcon } from './CoinIcon'
 
 // A little card after a study session: minutes, coins and how often you left.
 // summary = { id, minutes, coins?, penalty, leaves }  (coins only when logged in)
-export function SessionSummary({ summary, onClose }) {
+// onQuiz: offers "Quiz me" (logged in only; never forced)
+export function SessionSummary({ summary, onClose, onQuiz }) {
   if (!summary) return null
   const { minutes, coins, penalty, leaves } = summary
   return (
@@ -19,6 +20,11 @@ export function SessionSummary({ summary, onClose }) {
           left {leaves} {leaves === 1 ? 'time' : 'times'}
           {penalty > 0 && ` (−${penalty} ${penalty === 1 ? 'coin' : 'coins'})`}
         </span>
+      )}
+      {onQuiz && minutes > 0 && (
+        <button className="summary-quiz" onClick={onQuiz}>
+          Quiz me
+        </button>
       )}
       <button className="icon" onClick={onClose} aria-label="Close summary">
         ×

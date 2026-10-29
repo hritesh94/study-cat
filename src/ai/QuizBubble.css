@@ -1,0 +1,118 @@
+/* ── The quiz, in the cat's speech bubble ── */
+.bubble.quiz-bubble {
+  pointer-events: auto;
+  /* below the top bar, above the cat (it can be tall, so it hangs down from here) */
+  top: 4.4rem;
+  transform: translateX(-50%);
+  width: min(400px, calc(100% - 32px));
+  padding: 0.6rem 1rem 0.8rem;
+  font-size: 1.15rem;
+  text-align: left;
+  z-index: 5;
+}
+.quiz-close {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.4rem;
+  font-size: 1rem;
+  padding: 0 0.4rem;
+}
+.quiz-bubble p {
+  margin: 0 1.4rem 0.4rem 0;
+}
+.quiz-bubble small {
+  display: block;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.quiz-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.quiz-ask input {
+  font: inherit;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1rem;
+  padding: 0.35rem 0.6rem;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+}
+.quiz-ask button {
+  align-self: flex-start;
+}
+
+.quiz-thinking {
+  animation: quiz-think 1.2s ease-in-out infinite;
+}
+@keyframes quiz-think {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.quiz-option {
+  text-align: left;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 0.95rem;
+  padding: 0.3rem 0.7rem;
+}
+.quiz-option.chosen {
+  outline: 2px dashed var(--ink);
+}
+.quiz-option.right {
+  background: var(--sage-light);
+  font-weight: 600;
+}
+.quiz-option.wrong {
+  background: #f4c9c4;
+  text-decoration: line-through;
+}
+.quiz-option:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.quiz-feedback {
+  margin-top: 0.5rem;
+  font-size: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.quiz-feedback button,
+.quiz-done button {
+  align-self: flex-start;
+}
+.quiz-done {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.quiz-done.serious p {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 1rem;
+}
+.quiz-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-thinking {
+    animation: none;
+  }
+}

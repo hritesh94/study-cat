@@ -34,6 +34,7 @@ export function makeStore({ db, admin, userId }) {
     chatHistory: async (n) =>
       must(await db.from('chat_messages').select('role, text, meta, created_at').order('created_at', { ascending: false }).limit(n)).reverse(),
     saveChat: async (rows) => must(await admin.from('chat_messages').insert(rows.map((r) => ({ ...r, user_id: userId })))),
+    saveQuiz: async (topic, questions) => must(await admin.from('quizzes').insert({ user_id: userId, topic, questions }).select('id').single()),
     saveRoadmap: async (goalId, plan) =>
       must(await admin.from('roadmaps').insert({ user_id: userId, goal_id: goalId, plan }).select('id, goal_id, plan, created_at').single()),
   }

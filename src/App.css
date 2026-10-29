@@ -353,6 +353,10 @@ button.icon {
   color: #b4473c;
   font-weight: 500;
 }
+.summary-quiz {
+  font-size: 0.85rem;
+  padding: 0.15rem 0.7rem;
+}
 @keyframes summary-in {
   from {
     transform: translateX(-50%) translateY(-10px);

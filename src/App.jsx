@@ -3,7 +3,9 @@ import { AccountPanel } from './components/AccountPanel'
 import { ChatPanel } from './ai/ChatPanel'
 import { GoalForm } from './ai/GoalForm'
 import { GoalRing } from './ai/GoalRing'
+import { QuizBubble } from './ai/QuizBubble'
 import { RoadmapPanel } from './ai/RoadmapPanel'
+import { useQuiz } from './ai/useQuiz'
 import { buildSchedule, dayTarget } from './ai/schedule'
 import { useChat } from './ai/useChat'
 import { useGoal } from './ai/useGoal'
@@ -284,6 +286,10 @@ export default function App() {
     if (action === 'confirm-goal') return goalApi.saveGoal(payload)
     if (action === 'edit-goal') return openGoalForm(payload)
     if (action === 'goal') return openGoalForm(null)
+    if (action === 'quiz') {
+      setSheet(null)
+      return offerQuiz()
+    }
     if (action === 'roadmap') {
       if (!goalApi.goal) return openGoalForm(null)
       setSheet('roadmap')
@@ -345,11 +351,10 @@ export default function App() {
   }, [coinPop])
   // ── Today's goal (the ring) and the +15 coins when it's reached ──
   const studyGoal = goalApi.goal
+  const studyPlan = goalApi.roadmap?.plan
   const goalTarget = profile && studyGoal && today < studyGoal.deadline ? dayTarget(studyGoal, today, gameRules) : null
-  const schedule = useMemo(
-    () => (studyGoal ? buildSchedule({ goal: studyGoal, plan: goalApi.roadmap?.plan, today, rules: gameRules }) : null),
-    [studyGoal, goalApi.roadmap, today, gameRules],
-  )
+  // (cheap: one pass over the days left; the React compiler memoizes it)
+  const schedule = studyGoal ? buildSchedule({ goal: studyGoal, plan: studyPlan, today, rules: gameRules }) : null
   const claimedDay = useRef(null)
   const claimDailyGoal = goalApi.claimDailyGoal
   useEffect(() => {
@@ -372,7 +377,7 @@ export default function App() {
   // (the subject is made for you the first time).
   const nextChapter = schedule?.today?.chapters[0] ?? schedule?.next ?? null
   const subjectFor = (name) => subjectsApi.subjects.find((s) => s.name.toLowerCase() === name?.toLowerCase())
-  const roadmapSubjects = useMemo(() => [...new Set((goalApi.roadmap?.plan?.chapters ?? []).map((c) => c.subject))], [goalApi.roadmap])
+  const roadmapSubjects = useMemo(() => [...new Set((studyPlan?.chapters ?? []).map((c) => c.subject))], [studyPlan])
   const addingSubjects = useRef(false)
   const subjectList = subjectsApi.subjects
   const addSubject = subjectsApi.add
@@ -386,6 +391,28 @@ export default function App() {
       addingSubjects.current = false
     })()
   }, [profile, roadmapSubjects, subjectList, addSubject])
+
+  // ── The break quiz: offered after a session, never forced ──
+  const quizApi = useQuiz({
+    onFinish: (r) => {
+      mergeProfile({ coins: r.coins })
+      setStatsVersion((v) => v + 1)
+      if (r.coins_awarded > 0) {
+        setCoinPop({ id: Date.now(), coins: r.coins_awarded })
+        setCoinBump(true)
+      }
+      game.current?.celebrate()
+      latest.current.say(pickLine('quiz.done'))
+    },
+  })
+  // the topic: this session's roadmap chapter, else its subject
+  const offerQuiz = () => {
+    const chapters = goalApi.roadmap?.plan?.chapters ?? []
+    const done = new Set(goalApi.goal?.done_chapters ?? [])
+    const chapter = subject ? chapters.find((c) => !done.has(c.id) && c.subject.toLowerCase() === subject.name.toLowerCase()) : nextChapter
+    setSummary(null)
+    quizApi.offer(chapter?.name ?? subject?.name ?? '', chapter?.subject ?? subject?.name ?? null)
+  }
 
   const timerGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (away ?? 'study') : 'break'
   const catGoal = wardrobeOpen ? 'showOff' : timerGoal
@@ -565,7 +592,7 @@ export default function App() {
         </div>
       </header>
 
-      {bubble && (
+      {bubble && !quizApi.quiz && (
         // the whole line is laid out at once (so the bubble doesn't grow
         // while typing); the not-yet-typed part is just invisible
         <div className="bubble" key={bubble.turn ?? bubble.id} role="status">
@@ -578,7 +605,8 @@ export default function App() {
       )}
 
       <CoinPop pop={coinPop} />
-      <SessionSummary summary={summary} onClose={() => setSummary(null)} />
+      <SessionSummary summary={summary} onClose={() => setSummary(null)} onQuiz={profile && !focusing ? offerQuiz : undefined} />
+      <QuizBubble api={quizApi} />
       <ForgiveCard
         card={focusing ? forgiveCard : null}
         onForgive={forgiveLeave}

@@ -16,6 +16,7 @@ import { studyStats } from '../supabase/functions/_shared/stats.js'
 import { image, text } from '../supabase/functions/_shared/validate.js'
 import { chat, ONBOARDING_HELLO, validGoal } from '../supabase/functions/_shared/handlers/chat.js'
 import { availableHours, roadmap } from '../supabase/functions/_shared/handlers/roadmap.js'
+import { quiz, validQuestions } from '../supabase/functions/_shared/handlers/quiz.js'
 import { buildSchedule, dayTarget } from '../src/ai/schedule.js'
 
 let passed = 0
@@ -322,6 +323,39 @@ console.log('\nThe schedule (plain code, no AI)')
   const tooMuch = buildSchedule({ goal: { ...goal, deadline: '2026-11-04' }, plan, today: '2026-10-30', rules })
   check("too much for the time left: the rest is listed as not fitting", tooMuch.behind && tooMuch.unscheduled.length > 0)
   check('after the deadline: no days', buildSchedule({ goal: { ...goal, deadline: '2026-10-30' }, plan, today: '2026-10-30', rules }).days.length === 0)
+}
+
+console.log('\nBreak quiz')
+{
+  const good = (n) => ({ q: `Question ${n}?`, options: ['A', 'B', 'C', 'D'], answer: n % 4, explain: `Because ${n}.` })
+  const store = fakeStore({ limit: 10 })
+  let saved = null
+  store.saveQuiz = async (topic, questions) => {
+    saved = { topic, questions }
+    return { id: 'q1' }
+  }
+  const ai = fakeAi({ questions: [good(1), good(2), good(3)] })
+  const out = await quiz({ topic: 'Optics', subject: 'Physics' }, deps(store, ai))
+  check('3 questions come back', out.quizId === 'q1' && out.questions.length === 3 && out.questions[0].options.length === 4)
+  check('the answers never go to the browser', out.questions.every((q) => !('answer' in q) && !('explain' in q)) && !JSON.stringify(out).includes('Because'))
+  check('…but they are saved for answer_quiz', saved.questions[1].answer === 2 && saved.questions[1].explain === 'Because 2.')
+  check('the topic and subject go to the AI', ai.calls[0].messages[0].text.includes('Optics') && ai.calls[0].system.includes('Subject: Physics'))
+  const messy = validQuestions({
+    questions: [
+      { q: 'No answer?', options: ['A', 'B', 'C', 'D'], answer: 7, explain: 'x' },
+      { q: 'Same options?', options: ['A', 'A', 'B', 'C'], answer: 0, explain: 'x' },
+      good(1),
+      good(2),
+      { q: 'Two options only?', options: ['A', 'B'], answer: 0, explain: 'x' },
+      good(3),
+    ],
+  })
+  check('broken questions from the AI are skipped', messy.length === 3 && messy[0].q === 'Question 1?')
+  check('fewer than 3 good questions → bad_output', (await throwsCode(async () => validQuestions({ questions: [good(1)] }), 'bad_output')) === true)
+  check('10 quizzes a day: the 11th is refused before the AI', (await throwsCode(() => quiz({ topic: 'x' }, deps(fakeStore({ limit: 10, used: 10 }), fakeAi('x'))), 'limit')) === true)
+  check('a topic over 200 characters is refused', (await throwsCode(() => quiz({ topic: 'x'.repeat(201) }, deps(fakeStore(), fakeAi('x'))), 'too_big')) === true)
+  const sad = await quiz({ topic: 'I want to die' }, deps(fakeStore(), fakeAi('x')))
+  check('a topic that suggests distress gets the crisis answer, not a quiz', sad.crisis === true && !sad.questions)
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`)

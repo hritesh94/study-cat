@@ -474,6 +474,52 @@ check("users can't call the helper functions", r.error?.includes('permission den
 r = await as(null, `select public.claim_daily_goal($1)`, [today])
 check("logged-out visitors can't claim", r.error?.includes('permission denied'), r.error ?? 'no error')
 
+console.log('\nBreak quiz (migration 10)')
+const questions = JSON.stringify([
+  { q: 'One?', options: ['a', 'b', 'c', 'd'], answer: 1, explain: 'b is one' },
+  { q: 'Two?', options: ['a', 'b', 'c', 'd'], answer: 2, explain: 'c is two' },
+  { q: 'Three?', options: ['a', 'b', 'c'], answer: 0, explain: 'a is three' },
+])
+r = await as(D, `insert into public.quizzes (user_id, topic, questions) values ($1, 'x', $2)`, [D, questions])
+check("users can't write quizzes (only the quiz function)", r.error?.includes('permission denied'), r.error ?? 'no error')
+const makeQuiz = async (uid) => (await asService(`insert into public.quizzes (user_id, topic, questions) values ($1, 'Optics', $2) returning id`, [uid, questions])).rows[0].id
+const quizD = await makeQuiz(D)
+r = await as(D, `select questions from public.quizzes`)
+check("users can't read a quiz's questions (they hold the answers)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(D, `select id, topic from public.quizzes`)
+check('…but they can see their quizzes', r.rows.length === 1 && r.rows[0].topic === 'Optics')
+const answer = async (uid, id, choice) => as(uid, `select public.answer_quiz($1, $2, $3) as r`, [id, choice, today])
+r = await answer(A, quizD, 1)
+check("Ana can't answer Dee's quiz", r.error?.includes('not found'), r.error ?? 'no error')
+r = await answer(D, quizD, 9)
+check('an answer that is not one of the options is refused', r.error?.includes('No such answer'), r.error ?? 'no error')
+const coinsBeforeQuiz = await coinsOf(D)
+let a1 = (await answer(D, quizD, 1)).rows[0]?.r
+check('a right answer: correct, with the explanation', a1?.correct === true && a1.explain === 'b is one' && !a1.finished && a1.coins_awarded === 0, JSON.stringify(a1))
+a1 = (await answer(D, quizD, 0)).rows[0]?.r
+check('a wrong answer: shows the right one', a1?.correct === false && a1.answer === 2 && a1.score === 1, JSON.stringify(a1))
+check('no coins before the quiz is finished', (await coinsOf(D)) === coinsBeforeQuiz)
+await admin(`update public.game_settings set daily_coin_cap = 99999`)
+a1 = (await answer(D, quizD, 0)).rows[0]?.r
+check('finishing gives +5 coins (right or wrong)', a1?.finished === true && a1.coins_awarded === 5 && a1.score === 2 && (await coinsOf(D)) === coinsBeforeQuiz + 5, JSON.stringify(a1))
+r = await answer(D, quizD, 0)
+check('a finished quiz takes no more answers (no coins twice)', r.error?.includes('already finished') && (await coinsOf(D)) === coinsBeforeQuiz + 5, r.error ?? 'no error')
+check('the bonus is recorded once', (await admin(`select count(*)::int as n from public.bonus_coins where ref = $1`, [quizD]))[0].n === 1)
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+// the quiz bonus counts toward the daily cap
+const quizE = await makeQuiz(E)
+await admin(`update public.game_settings set daily_coin_cap = (select public._day_coins($1, $2::date)) + 2`, [E, today])
+for (const choice of [1, 2]) await answer(E, quizE, choice)
+a1 = (await answer(E, quizE, 0)).rows[0]?.r
+check('the quiz bonus stops at the daily cap (only 2 left)', a1?.coins_awarded === 2 && a1.capped === true, JSON.stringify(a1))
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+const old = await makeQuiz(D)
+await admin(`update public.quizzes set created_at = now() - interval '7 hours' where id = $1`, [old])
+r = await answer(D, old, 1)
+check('a quiz older than 6 hours expires', r.error?.includes('expired'), r.error ?? 'no error')
+r = await as(null, `select public.answer_quiz($1, 0, $2)`, [quizD, today])
+check("logged-out visitors can't answer", r.error?.includes('permission denied'), r.error ?? 'no error')
+
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {
   console.log('Failed:\n - ' + failures.join('\n - '))
