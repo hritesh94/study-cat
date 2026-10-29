@@ -138,7 +138,18 @@ button.mode.picked {
 
 /* ── personality, language, spicy ── */
 .mode-list.personalities {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 480px) {
+  /* phones: one personality per row, name, description and sample stacked */
+  .mode-list.personalities {
+    grid-template-columns: 1fr;
+  }
+  .personalities button.mode {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+  }
 }
 .mode-sample {
   font-family: 'Patrick Hand', cursive;
@@ -170,4 +181,10 @@ button.mode.picked {
 .prefs-note-inline {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.prefs-memory {
+  align-self: flex-start;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.8rem;
 }

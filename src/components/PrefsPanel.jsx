@@ -28,7 +28,8 @@ const LANGUAGES = [
 // sound, and strictness (book mode joins on phones).
 //   catStyle = { personality, language, spicy }; onStyleChange(fields)
 //   onSay(line): the cat says a sample line
-export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, catStyle, onStyleChange, onSay, children }) {
+//   onMemory: opens "What the cat knows about me" (logged in only)
+export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, catStyle, onStyleChange, onSay, onMemory, children }) {
   const closeButton = useRef(null)
   const [confirmToxic, setConfirmToxic] = useState(false)
   const pickMode = (id) => {
@@ -108,6 +109,12 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
           <span className="prefs-label">Spicy lines</span> <span className="prefs-note-inline">(contains swearing)</span>
         </span>
       </label>
+
+      {onMemory && (
+        <button className="prefs-memory" onClick={onMemory}>
+          🧠 What the cat knows about me
+        </button>
+      )}
 
       <div className="prefs-row">
         <span className="prefs-label" id="volume-label">

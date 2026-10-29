@@ -3,6 +3,8 @@ import { AccountPanel } from './components/AccountPanel'
 import { ChatPanel } from './ai/ChatPanel'
 import { GoalForm } from './ai/GoalForm'
 import { GoalRing } from './ai/GoalRing'
+import { MemoryPanel } from './ai/MemoryPanel'
+import { useLearning } from './ai/useLearning'
 import { QuizBubble } from './ai/QuizBubble'
 import { RoadmapPanel } from './ai/RoadmapPanel'
 import { useQuiz } from './ai/useQuiz'
@@ -94,8 +96,11 @@ export default function App() {
     setLocalStyle({ ...catStyle, ...fields })
     if (profile) updateProfile(fields)
   }
-  // a line for a situation, in this cat's voice (see src/game/catLines.js)
-  const line = (situation, extra) => pickLine(situation, { ...catStyle, strict: studyMode === 'toxic', ...extra })
+  // ── The cat learns you (if you let it): memory + today's fresh lines ──
+  const learning = useLearning({ profile, updateProfile, catStyle })
+  // a line for a situation, in this cat's voice: today's pack first, then
+  // the fixed lines (see src/game/catLines.js)
+  const line = (situation, extra) => pickLine(situation, { ...catStyle, strict: studyMode === 'toxic', pack: learning.packLines, ...extra })
 
   // ── Subjects: what you're studying (picked when a session starts) ──
   const subjectsApi = useSubjects(profile?.id ?? null)
@@ -290,7 +295,7 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar' | 'chat' | 'goal' | 'roadmap' | 'report'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar' | 'chat' | 'goal' | 'roadmap' | 'report' | 'memory'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
   const prefsRef = useRef(null)
@@ -302,6 +307,7 @@ export default function App() {
   const roadmapRef = useRef(null)
   const ringButton = useRef(null)
   const reportRef = useRef(null)
+  const memoryRef = useRef(null)
   const calendarOpener = useRef(null) // the 🔥 or the Today pill, whichever opened it
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
@@ -313,7 +319,7 @@ export default function App() {
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
     const from =
-      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener, chat: chatButton, roadmap: ringButton, goal: ringButton, report: calendarOpener }[openSheet.current] ?? myCatButton
+      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener, chat: chatButton, roadmap: ringButton, goal: ringButton, report: calendarOpener, memory: prefsButton }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
   }, [setSheet])
@@ -324,10 +330,10 @@ export default function App() {
   }
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef, chatRef, goalRef, roadmapRef, reportRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef, chatRef, goalRef, roadmapRef, reportRef, memoryRef], [])
 
   // ── Chat with the cat (the AI, logged in only) ──
-  const chat = useChat({ userId: profile?.id ?? null, open: sheet === 'chat' })
+  const chat = useChat({ userId: profile?.id ?? null, open: sheet === 'chat', onReply: learning.learnSoon })
   const situation = focusing ? 'studying' : timer.phase === 'break' ? (summary ? 'after_session' : 'break') : 'idle'
   const onChatAction = async (action, payload) => {
     if (action === 'login') return setSheet('account')
@@ -755,6 +761,7 @@ export default function App() {
         catStyle={catStyle}
         onStyleChange={setCatStyle}
         onSay={(sample) => voice.say(sample)}
+        onMemory={profile ? () => setSheet('memory') : undefined}
         modeLocked={focusing}
       />
       <ChatPanel
@@ -766,6 +773,7 @@ export default function App() {
         goal={goalApi.goal}
         situation={situation}
         onAction={onChatAction}
+        learning={learning}
       />
       <GoalForm ref={goalRef} open={sheet === 'goal'} onClose={closeSheet} start={goalFormStart} onSave={saveGoalForm} />
       <RoadmapPanel
@@ -777,6 +785,7 @@ export default function App() {
         today={today}
         onEditGoal={() => openGoalForm(goalApi.goal)}
       />
+      <MemoryPanel ref={memoryRef} open={sheet === 'memory'} onClose={closeSheet} api={learning} />
       <Wardrobe ref={wardrobeRef} open={wardrobeOpen} onClose={closeSheet} look={catLook} onChange={setCatLook} />
       {auth.enabled && (
         <AccountPanel

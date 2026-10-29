@@ -6,7 +6,8 @@ import { askCat } from './client'
 // function (table chat_messages); this loads them when the chat first
 // opens, sends new ones, and clears them all.
 //   message = { id, role: 'user' | 'cat', text, meta: { suggest?, goal?, crisis?, error? } }
-export function useChat({ userId, open }) {
+// onReply: after each reply from the cat (e.g. to learn from the chat later)
+export function useChat({ userId, open, onReply }) {
   const [state, setState] = useState({ userId: null, messages: [], loaded: false })
   const [sending, setSending] = useState(false)
   const [usage, setUsage] = useState(null) // { used, limit } after the last reply
@@ -60,9 +61,10 @@ export function useChat({ userId, open }) {
       if (data.suggest && data.suggest !== 'none') meta.suggest = data.suggest
       if (data.goal) meta.goal = data.goal
       add({ role: 'cat', text: data.reply, meta })
+      onReply?.(data)
       return data
     },
-    [add, sending],
+    [add, sending, onReply],
   )
 
   const clear = useCallback(async () => {
