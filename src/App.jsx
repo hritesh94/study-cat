@@ -82,6 +82,8 @@ export default function App() {
   const game = useRef(null)
   const panelRef = useRef(null)
   const [catBusy, setCatBusy] = useState(true)
+  // which cat you have (the shop and coins come later; for now it's saved here)
+  const [catLook, setCatLook] = useLocalStorage('studycat:cat', { breed: 'orange', outfit: null })
   const catGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (sad ? 'sad' : 'study') : 'break'
   const mood = focusing ? 'focus' : timer.phase === 'break' ? 'break' : 'idle'
 
@@ -110,6 +112,8 @@ export default function App() {
         ref={game}
         goal={catGoal}
         mood={mood}
+        look={catLook}
+        onLookChange={setCatLook}
         panelRef={panelRef}
         onBusy={setCatBusy}
         onMeow={() => voice.say(pick(MEOW_LINES))}

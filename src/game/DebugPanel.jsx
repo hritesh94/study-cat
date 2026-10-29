@@ -7,10 +7,11 @@ const TASKS = ['feed', 'play', 'bathe']
 const SPEEDS = [1, 0.5, 0.25, 0.1]
 
 // Open the app with ?debug in the address bar to get this panel.
+//  • Cat: pick any breed and outfit (saved, like the real choice will be)
 //  • Animations: play any animation directly (pauses the brain; may snap on purpose)
 //  • States: drive the brain yourself (it stops following the timer)
 //  • Speed: slow motion for checking that transitions line up
-export default function DebugPanel({ subscribe, sceneRef, onOverride }) {
+export default function DebugPanel({ subscribe, sceneRef, onOverride, look, onLookChange }) {
   const [state, setState] = useState(null)
   const [speed, setSpeed] = useState(1)
   const [open, setOpen] = useState(true)
@@ -59,6 +60,27 @@ export default function DebugPanel({ subscribe, sceneRef, onOverride }) {
         </dl>
       )}
 
+      {state?.breeds && (
+        <>
+          <h3>Breed</h3>
+          <div className="debug-row">
+            {state.breeds.map((b) => (
+              <button key={b} className={state.breed === b ? 'on' : undefined} onClick={() => onLookChange({ ...look, breed: b })}>
+                {b}
+              </button>
+            ))}
+          </div>
+          <h3>Outfit</h3>
+          <div className="debug-row">
+            {[null, ...state.outfits].map((o) => (
+              <button key={o ?? 'none'} className={state.outfit === o ? 'on' : undefined} onClick={() => onLookChange({ ...look, outfit: o })}>
+                {o ?? 'none'}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       <h3>States</h3>
       <div className="debug-row">
         {GOALS.map((g) => (
@@ -96,6 +118,12 @@ export default function DebugPanel({ subscribe, sceneRef, onOverride }) {
 
       <h3>Speed</h3>
       <div className="debug-row">
+        <button
+          className={speed < 1 ? 'on' : undefined}
+          onClick={() => changeSpeed((sceneRef.current?.anims.globalTimeScale ?? 1) < 1 ? 1 : 0.25)}
+        >
+          🐢 slow motion {speed < 1 ? 'on' : 'off'}
+        </button>
         {SPEEDS.map((s) => (
           <button key={s} className={speed === s ? 'on' : undefined} onClick={() => changeSpeed(s)}>
             {s}×

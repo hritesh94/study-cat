@@ -25,5 +25,5 @@ dist-ssr
 
 .vercel
 
-# cat generator output (python anims.py)
-tools/cat-generator/out/
+# HD cat generator output (python make.py)
+tools/cat-generator-hd/generator/out/

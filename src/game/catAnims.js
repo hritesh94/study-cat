@@ -1,5 +1,7 @@
 // ───────── The sprite pack's rules, written down as data ─────────
-// From tools/cat-generator/README.md ("How the transitions chain"):
+// The chains come from the sprite pack's README (the HD pack keeps "the same
+// 22 animations as before"), and were checked frame by frame on all 5 HD
+// breeds: each animation's last frame matches the next one's first frame.
 // every animation starts in one POSTURE and ends in one. The brain may only
 // play an animation if the cat is already in its starting posture, so the cat
 // never snaps from one pose to another.
@@ -40,6 +42,17 @@ export const ANIMS = {
   sleep: { from: 'sleep', to: 'sleep', loop: true },
   wake_up: { from: 'sleep', to: 'sit' },
 }
+
+// These three have no transition art in the pack: their first and last
+// frames are already head-in-bowl / crouched at the yarn / slumped, so a
+// straight cut into or out of them visibly jumps (measured: 19–41 % of the
+// cat's outline changes in one frame, vs ~3.5 % for a normal frame). The
+// brain softens those joins with a short crossfade instead.
+export const SOFT_JOIN = new Set(['eat', 'play', 'sad'])
+
+// Phaser animation keys are "<breed>:<name>", e.g. "tuxedo:walk".
+export const animKey = (breed, name) => `${breed}:${name}`
+export const baseName = (key) => key.slice(key.indexOf(':') + 1)
 
 // What the cat does while it's simply "in" a posture.
 export const RESTING = { stand: 'idle', sit: 'sit_idle', front: 'sit_front', read: 'read', sleep: 'sleep' }

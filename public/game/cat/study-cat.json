@@ -1,15 +1,52 @@
 {
-  "image": "study-cat.png",
-  "frameWidth": 64,
-  "frameHeight": 64,
+  "frameWidth": 128,
+  "frameHeight": 128,
   "framesPerRow": 10,
   "origin": {
     "x": 0.5,
-    "y": 0.8125,
-    "note": "feet touch this point; use sprite.setOrigin(x, y)"
+    "y": 0.8125
   },
-  "deskTopY": 42,
   "facing": "three-quarter right; flipX for left",
+  "deskTopY": 84,
+  "breeds": {
+    "orange": {
+      "image": "breeds/orange.png",
+      "name": "Orange tabby"
+    },
+    "tuxedo": {
+      "image": "breeds/tuxedo.png",
+      "name": "Tuxedo"
+    },
+    "white": {
+      "image": "breeds/white.png",
+      "name": "White"
+    },
+    "calico": {
+      "image": "breeds/calico.png",
+      "name": "Calico"
+    },
+    "siamese": {
+      "image": "breeds/siamese.png",
+      "name": "Siamese"
+    }
+  },
+  "outfits": {
+    "beanie": {
+      "image": "outfits/beanie.png"
+    },
+    "scarf": {
+      "image": "outfits/scarf.png"
+    },
+    "bow": {
+      "image": "outfits/bow.png"
+    },
+    "hoodie": {
+      "image": "outfits/hoodie.png"
+    },
+    "flowers": {
+      "image": "outfits/flowers.png"
+    }
+  },
   "animations": {
     "idle": {
       "start": 0,

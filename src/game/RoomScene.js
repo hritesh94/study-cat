@@ -1,52 +1,62 @@
 import Phaser from 'phaser'
 import { CatBrain } from './catBrain'
-import { BOWL_POS, C, drawProps, drawRoom, ROOM_TEX, YARN_POS } from './roomArt'
-import { FEET_Y, HEAD_TOP, LAMP, MUG, ROOM_W, SPOTS, VIEW_BOTTOM } from './layout'
+import { animKey, baseName } from './catAnims'
+import { BOWL_POS, C, drawProps, drawRoom, RES, ROOM_TEX, YARN_POS } from './roomArt'
+import { CAT_SCALE, FEET_Y, HEAD_TOP, LAMP, MUG, ROOM_W, SPOTS, VIEW_BOTTOM } from './layout'
 
-const DEPTH = { room: 0, leaves: 1, props: 2, light: 8, glow: 9, cat: 10, front: 20 }
+const DEPTH = { room: 0, leaves: 1, props: 2, light: 8, glow: 9, cat: 10, ghost: 12, front: 20 }
+const BASE = 'game/cat/'
+const MAX_ZOOM = 3 // 64 game px × 3 = 192 screen px = the HD art at 1.5×
+const MIN_VIEW_W = 130 // on phones, always show at least this much room across
+const FADE_MS = 240 // crossfade for joins the pack has no transition art for
 
-// The one Phaser scene: the cozy room + the cat.
+const catKey = (breed) => `cat-${breed}`
+const outfitKey = (outfit) => `outfit-${outfit}`
+
+// The one Phaser scene: the cozy room + the cat (+ its outfit).
 // React talks to it through `bridge` (see GameCanvas.jsx).
 export class RoomScene extends Phaser.Scene {
   constructor(bridge) {
     super('room')
     this.bridge = bridge
     this.inset = 0 // how much of the bottom the timer panel covers (screen px)
-    this.zoomNow = 3
+    this.zoomNow = 1
   }
 
   preload() {
-    this.load.spritesheet('cat', 'game/cat/study-cat.png', { frameWidth: 64, frameHeight: 64 })
-    this.load.json('catAnims', 'game/cat/study-cat.json')
+    // Read study-cat.json first; as soon as it's in, queue only the breed and
+    // outfit we need right now. Others load the first time they're picked
+    // (each sheet is ~14 MB of graphics memory, so loading all 10 up front
+    // would be ~140 MB — too much for many phones).
+    const look = this.bridge.look ?? {}
+    this.load.json('catMeta', `${BASE}study-cat.json`)
+    this.load.once('filecomplete-json-catMeta', (key, type, meta) => {
+      this.meta = meta
+      this.look = this.validLook(look)
+      this.queueSheets(this.look)
+    })
   }
 
   create() {
-    // animations, straight from the pack's JSON (as its README shows)
-    const meta = this.cache.json.get('catAnims')
-    for (const [key, a] of Object.entries(meta.animations)) {
-      this.anims.create({
-        key,
-        frames: this.anims.generateFrameNumbers('cat', { start: a.start, end: a.start + a.frames - 1 }),
-        frameRate: a.fps,
-        repeat: a.loop ? -1 : 0,
-      })
-    }
+    const meta = this.meta
+    this.ensureAnims(this.look.breed)
 
-    // room background, baked once into a texture
+    // room background, baked once into a texture (drawn at RES, shown at 1/RES)
     const g = this.make.graphics({}, false)
     drawRoom(g)
-    g.generateTexture('room', ROOM_TEX.w, ROOM_TEX.h)
+    g.generateTexture('room', ROOM_TEX.w * RES, ROOM_TEX.h * RES)
     g.destroy()
     drawProps(this)
-    this.add.image(ROOM_TEX.x, ROOM_TEX.y, 'room').setOrigin(0).setDepth(DEPTH.room)
+    const art = (x, y, key) => this.add.image(x, y, key).setScale(1 / RES)
+    art(ROOM_TEX.x, ROOM_TEX.y, 'room').setOrigin(0).setDepth(DEPTH.room)
 
     // props that come and go
     this.props = {
-      bowl: this.add.image(BOWL_POS.x, BOWL_POS.y, 'bowl').setOrigin(0.5, 1).setDepth(DEPTH.props),
-      yarn: this.add.image(YARN_POS.x, YARN_POS.y, 'yarn').setOrigin(0.5, 1).setDepth(DEPTH.props),
+      bowl: art(BOWL_POS.x, BOWL_POS.y, 'bowl').setOrigin(0.5, 1).setDepth(DEPTH.props),
+      yarn: art(YARN_POS.x, YARN_POS.y, 'yarn').setOrigin(0.5, 1).setDepth(DEPTH.props),
     }
-    this.add.image(SPOTS.tub, FEET_Y - 3, 'tubBack').setDepth(DEPTH.props)
-    this.tubFront = this.add.image(SPOTS.tub, FEET_Y - 2, 'tubFront').setOrigin(0.5, 0).setDepth(DEPTH.props)
+    art(SPOTS.tub, FEET_Y - 3, 'tubBack').setDepth(DEPTH.props)
+    this.tubFront = art(SPOTS.tub, FEET_Y - 2, 'tubFront').setOrigin(0.5, 0).setDepth(DEPTH.props)
 
     this.makeWindowLife()
     this.makeSteam()
@@ -57,7 +67,7 @@ export class RoomScene extends Phaser.Scene {
       speedY: { min: -18, max: -8 },
       speedX: { min: -4, max: 4 },
       lifespan: 1400,
-      scale: { start: 0.6, end: 1 },
+      scale: { start: 0.6 / RES, end: 1 / RES },
       alpha: { start: 1, end: 0 },
       frequency: 140,
       emitting: false,
@@ -66,39 +76,151 @@ export class RoomScene extends Phaser.Scene {
 
     // the cat — feet on the origin, as the pack's README says
     const o = meta.origin
-    this.cat = this.add.sprite(SPOTS.rug, FEET_Y, 'cat', 0).setOrigin(o.x, o.y).setDepth(DEPTH.cat)
+    const sprite = (key) => this.add.sprite(SPOTS.rug, FEET_Y, key, 0).setOrigin(o.x, o.y).setScale(CAT_SCALE)
+    this.cat = sprite(catKey(this.look.breed)).setDepth(DEPTH.cat)
     this.cat.setInteractive({ pixelPerfect: true, useHandCursor: true })
     this.cat.on('pointerdown', () => this.brain.poke())
+    // the outfit: a second sprite glued on top of the cat (see syncOutfit)
+    this.outfit = sprite(catKey(this.look.breed)).setVisible(false)
+    // "ghosts" of the last frame, faded out to soften joins without transition art
+    this.ghost = sprite(catKey(this.look.breed)).setVisible(false).setDepth(DEPTH.ghost)
+    this.ghostOutfit = sprite(catKey(this.look.breed)).setVisible(false).setDepth(DEPTH.ghost + 1)
+    this.applyOutfit(this.look.outfit)
 
     this.brain = new CatBrain(this, this.cat, {
+      key: (name) => animKey(this.look.breed, name),
+      info: (name) => meta.animations[name],
+      crossfade: () => this.crossfade(),
       onBusy: (busy) => this.bridge.onBusy?.(busy),
       onMeow: () => this.bridge.onMeow?.(),
-      onChange: (state) => this.bridge.onState?.(state),
+      onChange: (state) =>
+        this.bridge.onState?.({ ...state, ...this.look, breeds: Object.keys(meta.breeds), outfits: Object.keys(meta.outfits) }),
       setProp: (name, visible) => this.props[name].setVisible(visible),
       setTub: (inTub) => this.tubFront.setDepth(inTub ? DEPTH.front : DEPTH.props),
       setBubbles: (on) => (on ? this.bubbles.start() : this.bubbles.stop()),
     })
 
-    this.events.once('destroy', () => this.brain.destroy())
+    // Glue the outfit to the cat right before every draw (after all game
+    // logic has run, so it can never be a frame behind).
+    this.game.events.on('prerender', this.syncOutfit, this)
+    this.events.once('destroy', () => {
+      this.game.events.off('prerender', this.syncOutfit, this)
+      this.brain.destroy()
+    })
     this.scale.on('resize', () => this.layoutCamera(true))
     this.layoutCamera(true)
     this.bridge.ready?.(this)
   }
 
-  // ── camera: integer zoom (crisp pixels), floor kept above the timer panel ──
+  // ── breeds and outfits ──
+  validLook({ breed, outfit } = {}) {
+    return {
+      breed: this.meta.breeds[breed] ? breed : 'orange',
+      outfit: outfit && this.meta.outfits[outfit] ? outfit : null,
+    }
+  }
+  sheet(key, image) {
+    if (!this.textures.exists(key)) {
+      this.load.spritesheet(key, BASE + image, { frameWidth: this.meta.frameWidth, frameHeight: this.meta.frameHeight })
+    }
+  }
+  queueSheets({ breed, outfit }) {
+    this.sheet(catKey(breed), this.meta.breeds[breed].image)
+    if (outfit) this.sheet(outfitKey(outfit), this.meta.outfits[outfit].image)
+  }
+  // one set of animations per breed: "<breed>:<name>", from the JSON's list
+  ensureAnims(breed) {
+    for (const [name, a] of Object.entries(this.meta.animations)) {
+      const key = animKey(breed, name)
+      if (this.anims.exists(key)) continue
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(catKey(breed), { start: a.start, end: a.start + a.frames - 1 }),
+        frameRate: a.fps,
+        repeat: a.loop ? -1 : 0,
+      })
+    }
+  }
+
+  // Change breed and/or outfit. Loads sheets the first time they're used.
+  setLook(next) {
+    const look = this.validLook(next)
+    const wanted = (this.lookRequest = look)
+    const apply = () => {
+      if (this.lookRequest !== wanted) return // a newer pick won
+      if (look.breed !== this.look.breed) this.applyBreed(look.breed)
+      if (look.outfit !== this.look.outfit) this.applyOutfit(look.outfit)
+      this.look = look
+      this.brain.emit()
+    }
+    this.queueSheets(look)
+    if (this.load.list.size > 0) {
+      this.load.once('complete', apply)
+      this.load.start()
+    } else apply()
+  }
+  // Swap the breed without losing the cat's place: same animation, same frame.
+  applyBreed(breed) {
+    this.ensureAnims(breed)
+    this.look = { ...this.look, breed }
+    const current = this.cat.anims.currentAnim
+    if (!current) return this.cat.setTexture(catKey(breed), this.cat.frame.name)
+    const frameIndex = Math.max(0, (this.cat.anims.currentFrame?.index ?? 1) - 1)
+    this.cat.play({ key: animKey(breed, baseName(current.key)), startFrame: frameIndex })
+  }
+  applyOutfit(outfit) {
+    this.look = { ...this.look, outfit }
+    if (outfit) this.outfit.setTexture(outfitKey(outfit), this.cat.frame.name)
+    this.outfit.setVisible(!!outfit)
+  }
+  // As in the pack's README: same position, flip, frame number, one layer up.
+  syncOutfit() {
+    for (const [base, top] of [
+      [this.cat, this.outfit],
+      [this.ghost, this.ghostOutfit],
+    ]) {
+      if (!top.visible) continue
+      top.setPosition(base.x, base.y)
+      top.setFlipX(base.flipX)
+      top.setFrame(base.frame.name)
+      top.setDepth(base.depth + 1)
+      top.setAlpha(base.alpha)
+    }
+  }
+
+  // Freeze the current frame in a ghost on top and fade it out, while the
+  // real cat already plays the next animation underneath.
+  crossfade() {
+    const { cat, ghost, ghostOutfit } = this
+    this.tweens.killTweensOf(ghost)
+    ghost.setTexture(cat.texture.key, cat.frame.name).setPosition(cat.x, cat.y).setFlipX(cat.flipX)
+    ghost.setAlpha(1).setVisible(true)
+    ghostOutfit.setVisible(this.outfit.visible)
+    if (this.outfit.visible) ghostOutfit.setTexture(this.outfit.texture.key)
+    this.tweens.add({
+      targets: ghost,
+      alpha: 0,
+      duration: FADE_MS,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        ghost.setVisible(false)
+        ghostOutfit.setVisible(false)
+      },
+    })
+  }
+
+  // ── camera: floor kept above the timer panel, cat at most 1.5× its art ──
   targetZoom() {
     const { width, height } = this.scale
-    let zoom = Phaser.Math.Clamp(Math.floor((height - this.inset) / 140), 2, 4)
-    // narrow phones: show at least ~120 px of room across, so it's not all cat
-    if (zoom > 3 && width / zoom < 120) zoom = 3
-    return zoom
+    const fit = Math.min((height - this.inset) / 140, width / MIN_VIEW_W, MAX_ZOOM)
+    return Phaser.Math.Clamp(fit, 1, MAX_ZOOM)
   }
   layoutCamera(snap = false) {
     const cam = this.cameras.main
     const { width, height } = this.scale
     const target = this.targetZoom()
     this.zoomNow = snap ? target : Phaser.Math.Linear(this.zoomNow, target, 0.08)
-    if (Math.abs(this.zoomNow - target) < 0.01) this.zoomNow = target
+    if (Math.abs(this.zoomNow - target) < 0.002) this.zoomNow = target
     const zoom = this.zoomNow
     cam.setZoom(zoom)
     const viewW = width / zoom
@@ -122,8 +244,8 @@ export class RoomScene extends Phaser.Scene {
     const mask = glass.createGeometryMask()
     const colors = [C.orange, C.orangeDark, C.sage]
     const drop = () => {
-      const leaf = this.add.image(Phaser.Math.Between(62, 86), 36, 'leaf').setTint(Phaser.Utils.Array.GetRandom(colors))
-      leaf.setDepth(DEPTH.leaves).setMask(mask)
+      const leaf = this.add.image(Phaser.Math.Between(62, 86), 36, 'leaf').setScale(1 / RES)
+      leaf.setTint(Phaser.Utils.Array.GetRandom(colors)).setDepth(DEPTH.leaves).setMask(mask)
       const sway = Phaser.Math.FloatBetween(0, Math.PI * 2)
       const drift = Phaser.Math.Between(-30, -8)
       this.tweens.addCounter({
@@ -147,7 +269,8 @@ export class RoomScene extends Phaser.Scene {
 
   makeSteam() {
     const puff = () => {
-      const p = this.add.image(MUG.x + Phaser.Math.Between(2, 5), MUG.y - 1, 'pixel').setDepth(DEPTH.props).setAlpha(0.9)
+      const p = this.add.image(MUG.x + Phaser.Math.Between(2, 5), MUG.y - 1, 'pixel').setScale(1 / RES).setDepth(DEPTH.props)
+      p.setAlpha(0.9)
       this.tweens.add({ targets: p, y: MUG.y - 10, x: p.x + Phaser.Math.Between(-2, 2), alpha: 0, duration: 1800, onComplete: () => p.destroy() })
       this.time.delayedCall(500, puff)
     }

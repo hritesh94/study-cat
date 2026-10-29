@@ -1,4 +1,4 @@
-import { ANIMS, RESTING, path } from './catAnims'
+import { ANIMS, RESTING, SOFT_JOIN, baseName, path } from './catAnims'
 import { FEET_Y, SPOTS, TUB_FEET_Y, WALK_SPEED, WANDER } from './layout'
 
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -81,19 +81,21 @@ export class CatBrain {
     this.clearDebugListener()
     const info = ANIMS[name]
     this.anim = name
-    this.cat.play(name)
+    this.cat.play(this.hooks.key(name))
     this.posture = info.from
     this.emit()
     if (!info.loop) {
-      const event = `animationcomplete-${name}`
-      const fn = () => {
+      const event = 'animationcomplete'
+      const fn = (anim) => {
+        if (baseName(anim.key) !== name) return
+        this.cat.off(event, fn)
         this.debugListener = null
         this.posture = info.to
         if (info.flips) this.flip()
         this.rest(true)
       }
       this.debugListener = { event, fn }
-      this.cat.once(event, fn)
+      this.cat.on(event, fn)
     }
   }
   resume() {
@@ -151,10 +153,12 @@ export class CatBrain {
       this.violations++
       console.warn(`[cat] ${name} can't start from "${this.posture}"`)
     }
+    // no transition art for this join? blend it instead of cutting
+    if (this.anim && this.anim !== name && (SOFT_JOIN.has(name) || SOFT_JOIN.has(this.anim))) this.hooks.crossfade?.()
     this.anim = name
     this.history.push(name)
     if (this.history.length > 60) this.history.shift()
-    this.cat.play(name)
+    this.cat.play(this.hooks.key(name))
     this.emit()
     return true
   }
@@ -176,7 +180,11 @@ export class CatBrain {
         this.pending.delete(cancel)
         resolve()
       }
-      const onComplete = () => {
+      // listen for any completion and match by name, so swapping breed
+      // mid-animation (a different Phaser key) still counts
+      const onComplete = (anim) => {
+        if (baseName(anim.key) !== name) return
+        this.cat.off('animationcomplete', onComplete)
         const info = ANIMS[name]
         this.posture = info.to
         if (info.flips) this.flip()
@@ -184,11 +192,11 @@ export class CatBrain {
         done()
       }
       const cancel = () => {
-        this.cat.off(`animationcomplete-${name}`, onComplete)
+        this.cat.off('animationcomplete', onComplete)
         done()
       }
       this.pending.add(cancel)
-      this.cat.once(`animationcomplete-${name}`, onComplete)
+      this.cat.on('animationcomplete', onComplete)
       if (!this.start(name)) cancel()
     })
   }
@@ -199,8 +207,8 @@ export class CatBrain {
     return new Promise((resolve) => {
       if (this.paused) return resolve()
       if (this.anim !== name) this.start(name)
-      const a = this.scene.anims.get(name)
-      const loops = Math.max(1, Math.round((seconds * a.frameRate) / a.frames.length))
+      const a = this.hooks.info(name) // { fps, frames } from study-cat.json
+      const loops = Math.max(1, Math.round((seconds * a.fps) / a.frames))
       let count = 0
       const finish = () => {
         this.cat.off('animationrepeat', onRepeat)
@@ -240,8 +248,8 @@ export class CatBrain {
     if (this.stale(v)) return
     await this.turnToFace(x > this.cat.x ? 'right' : 'left', v)
     if (this.stale(v)) return
-    const walk = this.scene.anims.get('walk')
-    const cycle = walk.frames.length / walk.frameRate // seconds per stride
+    const walk = this.hooks.info('walk')
+    const cycle = walk.frames / walk.fps // seconds per stride
     const strides = Math.max(1, Math.round(dist / (WALK_SPEED * cycle)))
     if (!this.start('walk')) return
     await new Promise((resolve) => {
@@ -278,8 +286,7 @@ export class CatBrain {
 
   // The jump animation is drawn in place; we move the sprite during the leap frames.
   async jumpTo(x, y) {
-    const jump = this.scene.anims.get('jump')
-    const frame = 1000 / jump.frameRate
+    const frame = 1000 / this.hooks.info('jump').fps
     const fromX = this.cat.x
     const fromY = this.cat.y
     this.scene.tweens.addCounter({

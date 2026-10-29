@@ -1,7 +1,17 @@
-import json, os, copy, math
+import copy, math
 import numpy as np
-from PIL import Image, ImageDraw
-from cat import *
+from render_hd import pitchR
+
+STAND=dict(yaw=35,H=[-6,12,0],Hr=[8.2,7,6.6],bodyPitch=0,C=[5,13,0],Cr=[8.2,7.4,6.3],chestPitch=0,
+  head=[13.5,21.5,0],hyaw=0,hpitch=0,hroll=0,glasses=False,earDown=0,eye='open',mouth='closed',
+  legs=dict(fl=[[7,9,3.5],[7.5,5,3.5],[8,1.7,3.5]],fr=[[7,9,-3.5],[7.5,5,-3.5],[8,1.7,-3.5]],
+            bl=[[-8,10,3.8],[-5.5,6,3.8],[-8.5,1.7,3.8]],br=[[-8,10,-3.8],[-5.5,6,-3.8],[-8.5,1.7,-3.8]]),
+  tail=[[-13,15,0],[-20,17,0],[-21,26,0],[-17,32,0]],props={})
+SIT=dict(yaw=35,H=[-4,8,0],Hr=[8.6,7.6,7.4],bodyPitch=0,C=[1.5,15.5,0],Cr=[8.0,7.6,6.4],chestPitch=60,
+  head=[5,27.5,0],hyaw=0,hpitch=0,hroll=0,glasses=False,earDown=0,eye='open',mouth='closed',
+  legs=dict(fl=[[4,12,3.3],[5,6,3.3],[5.5,1.7,3.3]],fr=[[4,12,-3.3],[5,6,-3.3],[5.5,1.7,-3.3]],
+            bl=[[-5,7,5.6],[-1.5,3.5,6.2],[1.5,1.7,5.6]],br=[[-5,7,-5.6],[-1.5,3.5,-6.2],[1.5,1.7,-5.6]]),
+  tail=[[-11,4,0],[-16,1.6,4],[-12,1.6,10],[-4,1.6,11]],props={})
 
 def lerp(a,b,t):
     num=lambda v:isinstance(v,(int,float)) and not isinstance(v,bool)
@@ -169,34 +179,3 @@ NOTE=dict(idle='standing, breathing, small head turns, blink',walk='walk cycle, 
  read='reading loop',page_turn='paw flips a page',read_end='paws off book -> sit',sleep_down='sit -> curl up',sleep='curled up, breathing, zzz',
  wake_up='curled -> sit',eat='eating from a bowl',sad='ears down, a tear rolls',play='bats a yarn ball',jump='crouch, leap, tuck, land (move the sprite in the engine)')
 
-ZG=[(0,0),(1,0),(2,0),(3,0),(2,1),(1,2),(0,3),(1,3),(2,3),(3,3)]
-def overlay(img,P):
-    if 'zzz' in P:
-        hx,hy=project(np.array(P['head'])+[0,9,0],P['yaw']); t=P['zzz']; d=ImageDraw.Draw(img)
-        for j in range(3):
-            k=(t//2+j)%3
-            if j<=k:
-                ox,oy=hx+7+j*4,hy-6-j*5-k
-                for a,b in ZG: d.point((round(ox+a),round(oy+b)),fill=(74,46,48,255))
-    return img
-
-os.makedirs('out/gif',exist_ok=True)
-names=list(A); maxf=max(len(v) for v in A.values())
-sheet=Image.new('RGBA',(maxf*S,len(names)*S),(0,0,0,0))
-meta=dict(image='study-cat.png',frameWidth=S,frameHeight=S,framesPerRow=maxf,
-  origin=dict(x=AX/S,y=AY/S,note='feet touch this point; use sprite.setOrigin(x, y)'),
-  deskTopY=round(project([16.5,12.5,0],35)[1]),facing='three-quarter right; flipX for left',animations={})
-for r,n in enumerate(names):
-    frames=[overlay(Image.fromarray(render(build(P),P['yaw'])),P) for P in A[n]]
-    for c,f in enumerate(frames): sheet.alpha_composite(f,(c*S,r*S))
-    meta['animations'][n]=dict(start=r*maxf,frames=len(frames),fps=FPS[n],loop=n in LOOP,note=NOTE[n])
-    big=[]
-    for f in frames:
-        bg=Image.new('RGBA',(S,S),(246,233,211,255)); bg.alpha_composite(f)
-        big.append(bg.resize((S*5,S*5),Image.NEAREST).convert('P',palette=Image.ADAPTIVE,colors=128))
-    big[0].save(f'out/gif/{n}.gif',save_all=True,append_images=big[1:],duration=int(1000/FPS[n]),loop=0)
-    print(n,len(frames))
-sheet.save('out/study-cat.png'); json.dump(meta,open('out/study-cat.json','w'),indent=2)
-prev=Image.new('RGBA',sheet.size,(246,233,211,255)); prev.alpha_composite(sheet)
-prev.resize((sheet.width*3,sheet.height*3),Image.NEAREST).save('out/preview_x3.png')
-print(sheet.size, meta['deskTopY'])

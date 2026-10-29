@@ -6,23 +6,24 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 // The bridge between React and the Phaser game.
 //
 //  React → game:  `goal` (wander / study / sad / break), `mood` (lighting),
-//                 and ref.current.command('feed' | 'play' | 'bathe')
+//                 `look` ({ breed, outfit }), and
+//                 ref.current.command('feed' | 'play' | 'bathe')
 //  game → React:  onBusy (the cat is busy, so the break buttons are disabled),
 //                 onMeow (the cat was clicked and meows), and the cat's head
 //                 position, written as CSS variables for the speech bubble.
 //
 // Phaser is big, so it's loaded only when this component mounts
 // (`import()` makes Vite put it in its own file).
-export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
+export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, onBusy, onMeow }) {
   const hostRef = useRef(null)
   const sceneRef = useRef(null)
   const bridge = useRef({})
-  const latest = useRef({ goal, mood })
+  const latest = useRef({ goal, mood, look })
   const debugOverride = useRef(false)
 
   // keep callbacks fresh without restarting the game
   useEffect(() => {
-    latest.current = { goal, mood }
+    latest.current = { goal, mood, look }
     Object.assign(bridge.current, { onBusy, onMeow })
   })
 
@@ -48,12 +49,14 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
     let lastY = null
 
     Object.assign(bridge.current, {
+      look: latest.current.look, // the breed/outfit to load first
       ready: (scene) => {
         sceneRef.current = scene
         // handy while developing: poke the game from the browser console
         if (import.meta.env.DEV) window.catScene = scene
         scene.brain.setGoal(latest.current.goal)
         scene.setMood(latest.current.mood)
+        scene.setLook(latest.current.look)
         measure()
       },
       onCatScreen: (x, y) => {
@@ -85,8 +88,9 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
       game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: host,
-        pixelArt: true, // nearest-neighbour scaling: crisp pixels
-        roundPixels: true,
+        // the HD art is smooth: keep filtering on (no pixelArt mode)
+        pixelArt: false,
+        antialias: true,
         backgroundColor: '#f6e9d3',
         banner: false,
         audio: { noAudio: true },
@@ -111,6 +115,9 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
   useEffect(() => {
     sceneRef.current?.setMood(mood)
   }, [mood])
+  useEffect(() => {
+    sceneRef.current?.setLook(look)
+  }, [look])
 
   return (
     <>
@@ -120,6 +127,8 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
           <DebugPanel
             subscribe={subscribe}
             sceneRef={sceneRef}
+            look={look}
+            onLookChange={onLookChange}
             onOverride={(on) => {
               debugOverride.current = on
               if (!on) sceneRef.current?.brain.setGoal(latest.current.goal)
