@@ -3,9 +3,9 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, and accounts with coins and streaks)
-**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`)
+**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1 and Phase 2 (accounts, coins, streaks) complete and live
+**Status:** Phase 1 and Phase 2 (accounts, coins, streaks) complete and live. Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) is built on branch `phase-2b`, not merged or deployed yet
 
 ---
 
@@ -22,12 +22,17 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Focus view | While studying: fullscreen, and everything hidden except the cat, the room and the time. |
 | Study | The cat walks to the desk, sits down, puts its glasses on and reads, turning a page every 20–40 s. |
 | No timer running | It wanders around the room, sits for a while, sometimes looks at you, and sometimes curls up for a nap. |
-| Click the cat | It turns to face you, meows (and says a line), then turns back and carries on. |
+| Click the cat | It turns to face you, meows (a real meow sound, and a line), then turns back and carries on. |
 | Break mode | The cat closes the book, stands up, walks to the rug, sits and looks at you. Then **Play 🧶** (bats the yarn), **Feed 🐟** (walks to the bowl and eats) and **Bathe 🫧** (hops into the tub, bubbles, a shake, hops out) unlock. |
-| Sad cat | Switch tabs during study and the cat closes its book and is sad (ears down, a tear). When you come back it complains, then goes back to reading after 4 s. |
+| Sad cat | Switch tabs during study and the cat closes its book and is sad (ears down, a tear). When you come back it says something (depending on the study mode), then goes back to reading. Away for **under 15 s** never counts. |
+| Study modes (2b) | In ⚙️ Settings: **Easy** (like before), **Medium** (2 free trips away per session, then each costs 10% of that session's coins) or **Toxic** (the cat turns its back and roasts you, and each leave costs 5 coins). Picking Toxic asks "Are you sure? The cat will roast you." The server applies the penalties. A card after each session says how long you studied, the coins, and "left N times". |
+| Phones (2b) | The screen stays on while you study (Screen Wake Lock). **📖 Book mode** (touch screens) is for reading on paper: the screen may sleep and that doesn't count as leaving. After a locked phone the timer is still right. |
+| Subjects (2b) | Starting a study session asks "What are you studying?": your last subject is already picked, or add one with a name and a colour. Saved to your account (or this browser when logged out). The subject shows next to the STUDY tag. |
+| Streak calendar (2b) | Tap the 🔥 (or the Today pill): a month view, each day in 4 shades of green by minutes, streak days joined by a flame trail, arrows and swipe to change month, tap a day for its minutes per subject, coins and sessions. The top shows your streak, best streak and this month's hours. |
+| Room progress (2b) | A wall shelf with one book per subject (thicker with more hours), a coin jar that fills with today's coins (sparkles when full), and a plant on the window sill that grows with your streak and droops when it breaks. Placeholder shapes for now, ready for real art. |
 | Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
-| Voice | The cat speaks short lines using the browser's built-in speech (Web Speech API). Mute button 🔊 in the top bar. |
-| Saved minutes | Today's study minutes are shown at the top and saved in `localStorage`, so they survive a reload. |
+| Voice | "Cat babble" (2b): each line types into the speech bubble while the cat babbles it in quick, soft, high blips, made live with the Web Audio API (happy = higher and bouncy, sad = lower and slower, annoyed = short and sharp). A recording at `public/voice/<line-id>.mp3` plays instead, if there is one. Mute 🔊 in the top bar (in ⚙️ Settings on phones), plus a volume slider in ⚙️ Settings. |
+| Saved minutes | Today's study minutes are shown at the top. Logged in they come from the server; logged out they're saved in `localStorage`, so they survive a reload. |
 | Accounts (phase-2) | **Log in** with an emailed magic link (no password). Logged in, you earn **coins** for studying and keep a **streak**, both shown in the top bar, with a "+N coins" pop when a session ends. Your cat look is saved to your account. Everything still works logged out. |
 | Saved settings | Your study/break lengths and mute choice are saved too. |
 
@@ -294,6 +299,64 @@ At first, magic links took ages: Supabase's built-in email sender is only for tr
 #### Testing the database without touching the real one
 `npm run test:db` runs all three migrations in **PGlite** (real Postgres compiled to WebAssembly, inside Node), with a stand-in for Supabase's `auth` schema, roles and default "everyone can do everything" grants. Two pretend users, Ana and Ben, go through **44 checks**: each sees only their own data, coins, streak, sessions, items and settings can't be written directly, session times come from the server, the daily cap holds, fake dates are pulled back, streaks count and reset, and the import happens once.
 
+### Step 18 — Phase 2b: voice, study modes, phones, subjects, calendar, room · built on branch `phase-2b` (not merged or deployed yet)
+Six parts, one commit each: `ecf4c61` voice, `04cae3d` study modes, `f7b55a6` phones, `b8e281d` subjects, `0bcfd27` calendar, `5a2af71` room progress.
+
+#### The database: paste 3 more files, in this order
+In Supabase: **SQL Editor → New query**, paste the whole file, **Run**, then the next one. Files 1–3 from step 17 are already in, so start at 4:
+4. `supabase/migrations/20261029000004_study_modes.sql`
+5. `supabase/migrations/20261029000005_subjects.sql`
+6. `supabase/migrations/20261029000006_stats.sql`
+
+They only add things. `end_session` and `start_session` are rebuilt with one extra, optional input each, so the live site (which doesn't send them) keeps working after you paste them. `npm run test:db` now runs all 6 files: **89 checks** (the 44 from step 17, all still passing, plus 45 new ones).
+
+#### Part 1 — The cat's voice (`src/audio/catVoice.js`, `src/game/catLines.js`)
+- **Cat babble** replaces the browser's speech voice. While a line types into the bubble, every letter makes a tiny blip: an oscillator (a tone generator) through a soft filter, with a quick fade in and out. The pitch wobbles a little at random, vowels are a bit brighter, and questions go up at the end.
+  - Moods: **happy** = higher and bouncy, **sad** = lower and slower, **annoyed** = short and sharp (a square wave), **neutral** in between.
+  - Browsers only allow sound after a click or tap, so the first tap unlocks it (and the cat greets you with a meow).
+- **Every line has a stable id**, like `leave.toxic.07`, in `src/game/catLines.js` (262 lines). The ids must never be reused: if `public/voice/<id>.mp3` exists, that recording plays instead of the babble, and the text types along with it.
+  - A small Vite plugin (`vite.config.js`) lists the files in `public/voice/`, so the app never tries to download recordings that don't exist.
+  - `npm run voice:lines` writes `voice-lines.csv` (id, group, mood, text, file name) for whoever records them.
+- **Meows** for clicks and greetings: 4 short sounds (`public/sounds/*.wav`) made by `tools/make-meows.mjs` from sine waves (a rising-then-falling pitch while the "mouth" moves from *m-i* to *a* to *ow*). They're our own work, released as **CC0**; see `CREDITS.md`.
+- **⚙️ Settings** sheet (new): mute and a **volume** slider (saved in `studycat:volume`). On phones the top-bar mute button moves in here, to make room.
+- The bubble lays out the whole line at once and reveals it letter by letter, so it doesn't grow while typing. Screen readers get the full line.
+
+#### Part 2 — Study modes (`useLeaveTracker`, `PrefsPanel`, migration 4)
+- `profiles.study_mode`: `'easy'` (default), `'medium'` or `'toxic'`; nothing else is allowed. The user may change it (a column grant), only on their own row (the RLS policy from step 17).
+- **The browser only sends how many times you left** (`end_session(session_id, local_day, leave_count)`). The server reads the mode saved on your profile and works out the coins. It never receives a coin amount. Sending a smaller number can only give back what the normal rules give.
+  - **Medium:** leaves after the 2nd remove 10% of that session's coins each (`floor(coins × 10% × extra leaves)`), never below 0.
+  - **Toxic:** 5 coins per leave, never below 0.
+  - The penalty comes off **before** the daily cap, and each session row stores `study_mode`, `leave_count` and `penalty_coins`. The new numbers are columns in `game_settings` (`medium_free_leaves`, `medium_leave_penalty_pct`, `toxic_leave_penalty_coins`).
+- **What the cat does** (at least 15 lines per mode and situation in `catLines.js`):
+  - Easy: sad while you're away, kind when you're back.
+  - Medium: normal lines for the first trip, it **calls you out on the 2nd**, then "ten percent off" lines.
+  - Toxic: it **turns its back** (a new `sulk` script: turn around, sit facing away) and roasts the behaviour (leaving, scrolling, procrastinating). It never says anything about the person, and there's no swearing. Pause, Reset or Skip during study gets a "quitting already?" line, and finishing a full session gets grudging praise.
+- The mode can't be changed in the middle of a session (Settings says why).
+
+#### Part 3 — Phones (`useWakeLock`, `useLeaveTracker`, `useTimer`)
+- **Screen Wake Lock**: while studying, the screen is asked to stay on. Browsers drop the lock when the page is hidden, so it's asked for again when it's visible. If a browser doesn't support it (or says no, e.g. battery saver), nothing happens.
+- **📖 Book mode** (shown on touch screens, under the timer): the page going hidden doesn't count as leaving, the cat says it'll wait, and it says welcome back. The wake lock is off in book mode, since the screen may sleep.
+- **Grace period:** away for under **15 s** never counts, in any mode. If the study time runs out while you're still away, that absence counts once it's past 15 s.
+- **Locked phone:** phones pause the page's timers. The timer always compared against the real clock, but the break used to start from when you unlocked. Now it starts from when study really ended, and a break that also ran out moves on to Study by itself.
+
+#### Part 4 — Subjects (`useSubjects`, `SubjectPicker`, migration 5)
+- New table `subjects` (name, colour, last used). RLS: you see, add, change and delete only your own. The browser may write only `name` and `color`; `user_id` is filled in from the login. Names are unique per user (ignoring capitals), at most 40 letters, colours like `#a1b2c3`, and at most 50 subjects (a trigger; `max_subjects` in `game_settings`).
+- `start_session(planned_minutes, subject_id)`: the subject is optional, must be yours, and gets marked as last used. Deleting a subject keeps its sessions (their subject just becomes empty).
+- **Start** on a fresh study session opens the picker. Resuming after Pause doesn't. Logged out, subjects live in `studycat:subjects`.
+
+#### Part 5 — Streak calendar (`StreakCalendar`, `useDailyTotals`, migration 6)
+- `daily_totals(from, to)` returns one row per day with study time: minutes, coins, sessions (with at least a minute counted) and minutes per subject. At most 62 days per call. `subject_totals()` gives all-time minutes per subject. Both run with the caller's own rights, so RLS still hides other people's rows.
+- The calendar's 4 green levels: 1–24 min, 25–59, 60–119, 120+ (`DAY_LEVELS` in `src/lib/calendar.js`). A streak day is one with 25+ minutes, the same rule as the server.
+- Logged in, **"Today: N min"** comes from the server and refreshes after every session. Logged out, the calendar uses this browser's history, which now also keeps minutes per subject (`studycat:studyMsBySubject`). Logged out there are no coins, and the streak is worked out from those minutes.
+
+#### Part 6 — Room progress (`src/game/roomProgress.js`, `RoomProgressLayer.js`)
+- **One config file** holds every position, threshold and stage:
+  - book thickness by hours (0, 1, 3, 8, 20, 50 h)
+  - the coin jar's size and colour
+  - plant stages at **0, 3, 7, 14 and 30** streak days (seed, sprout, leafy, bushy, blooming), and the droop (tilted and pale when you had a streak and it's back to 0)
+- Every item has an `art` slot, set to `null` for now, so simple placeholder shapes are drawn. To use real art, drop a PNG in `public/game/room/` and write its path in the config. It loads by itself, at the size in the config. Checked by pointing the blooming plant at an existing PNG.
+- The room drawing itself is unchanged. The shelf and jar sit on the empty wall between the plant and the picture, and the new plant sits on the window sill.
+
 ---
 
 ## 3. Project structure
@@ -304,12 +367,18 @@ study-cat/
 ├─ package.json             dependencies + scripts (dev, build, lint, preview)
 ├─ public/
 │  ├─ favicon.svg           🐱 tab icon
-│  └─ game/cat/             study-cat.json, breeds/, outfits/ (sheets) + thumbs/ (wardrobe pictures)
+│  ├─ game/cat/             study-cat.json, breeds/, outfits/ (sheets) + thumbs/ (wardrobe pictures)
+│  ├─ sounds/               the 4 meows (CC0, made by tools/make-meows.mjs)
+│  └─ voice/                recorded lines go here as <line-id>.mp3 (empty for now)
 ├─ tools/
 │  ├─ cat-generator-hd/     the HD pack's Python generator, previews, README (not deployed)
 │  ├─ make-thumbs.mjs       cuts the wardrobe pictures out of the sheets (npm run thumbs)
+│  ├─ make-meows.mjs        makes public/sounds/*.wav (npm run meows)
 │  └─ db-test.mjs           tests the database migrations in PGlite (npm run test:db)
-├─ supabase/migrations/     the 3 SQL files to paste into Supabase, in order
+├─ scripts/export-lines.mjs writes voice-lines.csv (npm run voice:lines)
+├─ voice-lines.csv          every cat line with its id, for recording
+├─ CREDITS.md               where every sound comes from (all CC0)
+├─ supabase/migrations/     the 6 SQL files to paste into Supabase, in order
 ├─ .env.local               your Supabase URL + publishable key (NOT committed)
 ├─ .env.example             the same names with no values (committed)
 └─ src/
@@ -317,16 +386,23 @@ study-cat/
    ├─ App.jsx               the screen: timer, panel, voice; tells the cat its goal
    ├─ App.css               panel, speech bubble (follows the cat), focus view
    ├─ index.css             palette + hand-drawn buttons and inputs
+   ├─ audio/catVoice.js     ★ cat babble (Web Audio), recordings, meows, volume
    ├─ lib/supabase.js       the Supabase client, local day, live streak
+   ├─ lib/calendar.js       dates for the calendar, the 4 day levels, local streaks
    ├─ hooks/                useTimer, useStudyStats, useCatVoice, useLocalStorage,
-   │                        useAuth, useProfile, useStudySessions
+   │                        useAuth, useProfile, useStudySessions, useLeaveTracker,
+   │                        useWakeLock, useSubjects, useDailyTotals, useSubjectTotals
    ├─ components/           Settings, BreakPanel, Wardrobe (My Cat), AccountPanel,
-   │                        CoinPop, CoinIcon, Sheet.css (shared bottom sheet)
+   │                        PrefsPanel (⚙️), SubjectPicker, StreakCalendar,
+   │                        SessionSummary, CoinPop, CoinIcon, Sheet.css (shared bottom sheet)
    └─ game/
       ├─ GameCanvas.jsx     React ↔ Phaser bridge (loads Phaser lazily)
       ├─ RoomScene.js       the Phaser scene: room, cat + outfit, breeds, camera, lighting
       ├─ catBrain.js        ★ the cat's state machine (goals, tasks, scripts)
       ├─ catItems.js        ★ every breed and outfit, with names and (future) locks
+      ├─ catLines.js        ★ everything the cat says, each line with a stable id
+      ├─ roomProgress.js    ★ bookshelf / coin jar / plant: stages, thresholds, art slots
+      ├─ RoomProgressLayer.js draws them (placeholder shapes or the configured art)
       ├─ catAnims.js        each animation's start/end posture, chain route-finder, soft joins
       ├─ layout.js          every spot and prop position (game pixels)
       ├─ roomArt.js         the drawing of the room and props (at 3× resolution)
@@ -350,6 +426,12 @@ study-cat/
 | `studycat:settings` | `{"studyMinutes":50,"breakMinutes":10}` | Your timer lengths |
 | `studycat:muted` | `false` | Whether the cat's voice is muted |
 | `studycat:cat` | `{"breed":"tuxedo","outfit":"scarf"}` | Which cat you have and what it wears |
+| `studycat:volume` | `0.7` | The cat's voice volume (0–1) |
+| `studycat:mode` | `"medium"` | Study mode when logged out (logged in, it's on your profile) |
+| `studycat:bookMode` | `false` | Book mode on or off |
+| `studycat:subjects` | `[{"id":"local-…","name":"Biology","color":"#7fb3c9"}]` | Your subjects when logged out |
+| `studycat:lastSubject` | `"local-…"` (or `"none"`) | The subject to preselect next time |
+| `studycat:studyMsBySubject` | `{"2026-10-29": {"local-…": 1200000, "": 300000}}` | Milliseconds per subject per day (`""` = no subject) |
 
 To reset everything, open the browser console on the site and run `localStorage.clear()`.
 
@@ -365,7 +447,9 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run preview` | Serves the built `dist/` locally, to check the release version |
 | `npm run lint` | Checks the code for common mistakes (oxlint) |
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
-| `npm run test:db` | Tests the Supabase migrations locally (two pretend users, 44 checks) |
+| `npm run test:db` | Tests the Supabase migrations locally (three pretend users, 89 checks) |
+| `npm run voice:lines` | Writes every cat line with its id to `voice-lines.csv` |
+| `npm run meows` | Re-makes the meow sounds in `public/sounds/` |
 | `npx vercel env ls` | Lists the environment variables on Vercel |
 | `git log --oneline` | Shows the commit history |
 | `git status` | Shows what changed since the last commit |
@@ -377,6 +461,30 @@ To reset everything, open the browser console on the site and run `localStorage.
 ---
 
 ## 5. How it was tested
+
+**Phase 2b (step 18)**, on desktop and phone size (375×812), logged out (logins need your inbox, so the logged-in part is your checklist below):
+- ✅ `npm run test:db`: **89/89**, including the 44 from step 17 unchanged. New: modes (default easy, only 3 values, can't change someone else's, Easy costs nothing, Medium 2 free then 10% each, never below 0, Toxic 5 per leave, a negative count is treated as 0, the penalty comes off before the cap, the cap still holds, coins = sum of sessions, the mode grant doesn't open `coins`), subjects (own rows only, can't add for someone else or hand one over, duplicate / bad colour / empty name refused, the limit, `start_session` with your own subject only, deleting keeps sessions), and stats (totals match the sessions, per-subject minutes, only your rows, 62-day limit, logged out refused).
+- ✅ **Voice:** one babble blip per letter (20 blips for "Study buddies, assemble!"), meow sounds on the greeting and on a click, the volume slider, mute, and the line typing into the bubble. With a test file at `public/voice/start.easy.01.mp3`, that line played the file instead of babbling (the test file was removed).
+- ✅ **Modes** (leaving the tab simulated): Toxic asked "Are you sure?", the start line was a roast, the cat **sulked** while away, the return line was a roast, Pause got a "quitting" line, and the card said "left 1 time". Medium: a normal line on leave 1, a call-out on leave 2, penalty lines on 3 and 4. The mode is locked during a session.
+- ✅ **Phones:** a 5 s look-away didn't count and the cat went straight back to reading, 20 s counted, and in book mode a 60 s absence didn't count ("I waited, just like I said."). With a 1-minute session and the clock moved 70 s on (a locked phone), the break showed **09:49**, not 10:00. Moved past the whole break, it was back on Study, waiting for Start.
+- ✅ **Subjects:** add with a colour, duplicate name refused, picked one shown next to STUDY, preselected next time.
+- ✅ **Calendar** (with sample history): streak 4, best 4, 7.9 h this month (all correct by hand), 8 streak days with trails only between neighbours in the same week, day detail per subject, arrows, swipe, no future months. Fixed: on phones the Sunday column was cut off.
+- ✅ **Room:** books by hours, the jar filling and sparkling at the cap, all 5 plant stages and the droop, checked by eye. A configured PNG replaced the placeholder.
+- ✅ **Phone top bar:** fits on one line (the word "Today:" hides under 420 px, and mute moves into ⚙️).
+- ✅ Lint and build clean. No console errors on a fresh load.
+- ⚠️ Not done by me: anything logged in (needs your magic link) and a real phone with a locked screen. See the checklist.
+
+#### Testing Phase 2b with two accounts (after pasting files 4, 5 and 6)
+Run it locally (`npm run dev`) or on a Vercel preview, since `main` and the live site don't have Phase 2b yet. Use two browsers, one account each, study set to **2 minutes** (the modes apply to any length; the bonus only from 25 min).
+1. **A:** ⚙️ Settings → **Medium**. Start → pick **+ new subject** "Maths", any colour → Start studying.
+2. Leave the tab 3 times, each for **more than 15 s**, then let it finish. The card says "left 3 times (−0 coins)" for a 2-coin session (10% of 2 rounds down to 0). For a visible penalty, do a 25-minute session: 25 + 10 bonus = 35, and a 3rd leave takes off 3.
+3. Leave for **under 15 s**: nothing is counted.
+4. ⚙️ → **Toxic** (it asks first). A 2-minute session with 1 leave → 0 coins (2 − 5, never below 0), and the cat turns its back.
+5. In the console: `await supabase.from('profiles').update({ study_mode: 'chaos' }).eq('id', (await supabase.auth.getUser()).data.user.id)` → an error (check constraint). `…update({ coins: 9999 })…` still → permission denied.
+6. Tap the 🔥 → today is green, tap it: Maths with its minutes, the coins and the sessions. "Today: N min" matches.
+7. The shelf shows a thin Maths book. The jar shows today's coins out of 300. The plant matches your streak.
+8. **B:** `await supabase.from('subjects').select('*')` → `[]` (none of A's). `await supabase.rpc('daily_totals', { p_from: '2026-10-01', p_to: '2026-10-31' })` → only B's days. B starts in Easy.
+9. **Phone:** open the Vercel preview on your phone, start studying and leave it: the screen should stay on. Lock it for a minute, unlock: the time is right. Turn on 📖 Book mode, lock it for 30 s: no leave counted.
 
 **Accounts (step 17)**
 - ✅ `npm run test:db`: 44/44 database checks with two simulated users (listed in step 17).
@@ -443,12 +551,16 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
 
 ## 6. Known limitations
 
-- Minutes are stored **per browser**: your friend's minutes and yours aren't shared or synced. (With an account, coins and streaks *are* saved online; "Today: N min" still counts this browser.)
+- Logged out, minutes and subjects are stored **per browser**. With an account, coins, streaks, subjects and minutes are saved online. Subjects made while logged out aren't copied into your account when you log in.
 - Login emails come from a Gmail address through Brevo (no domain yet), so a few may land in Spam until a real domain is set up.
 - If the tab is closed in the middle of a session, that session earns nothing (the server closes it with 0 the next time you start).
 - A trickster can still move their "today" up to 1 day ahead, but that only uses up tomorrow's cap early. It can't add coins beyond the real minutes studied.
 - Clearing browser data erases your minutes.
-- Speech voices vary by browser/OS, and some browsers need a click before audio plays.
+- Browsers need a tap before any sound plays, so the very first line (before you tap anything) is silent.
+- The leave count comes from the browser. Someone could send 0 to skip the Medium/Toxic penalties, but they can never get more than Easy gives, and the mode is their own choice anyway.
+- The leave count is per server session, and Pause → Start begins a new one, so pausing resets the free trips in Medium.
+- On iPhones, the wake lock needs iOS 16.4 or newer. Older ones just let the screen sleep (use Book mode).
+- The bookshelf, coin jar and plant are placeholder shapes until the HD room art arrives (`src/game/roomProgress.js`).
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
 - The sprite pack has no bath animation, so **Bathe** is assembled from jump, sit and a shake.
 - A change of plan waits for the current move to finish (up to about 2 s for a long loop like `read`), on purpose, so the cat never snaps.
@@ -458,7 +570,7 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
 - When locks become real, a saved breed or outfit that's locked will need a fallback (e.g. orange with no outfit). Today nothing is locked, so that can't happen yet.
 - After regenerating the sprite pack, run `npm run thumbs`, or the wardrobe pictures will be out of date.
 - The repo is public, so anything committed is visible to everyone. Keep secrets in `.env.local` (ignored), never in the code.
-- If the browser tab is in the background, the game pauses (browsers stop drawing hidden pages). The timer keeps counting correctly.
+- If the browser tab is in the background, the game pauses (browsers stop drawing hidden pages). The timer keeps counting correctly, also after a locked phone.
 
 ---
 
@@ -487,8 +599,9 @@ If a new sprite animation is added to the pack, add one line to `ANIMS` in `catA
 ## 8. Ideas for Phase 2
 
 - A shop: spend coins on breeds and outfits. Fill in the `lock`s in `catItems.js`, pass real `progress` (coins, streak, `owned_items`) to the wardrobe, and add a `buy_item` function on the server that checks the price
-- History chart and study streaks (the per-day data is already being saved)
-- Sounds (purring, meows, rain on the window) and a "session complete" notification
+- Recorded voice lines (`npm run voice:lines` → `voice-lines.csv`, files go in `public/voice/`)
+- More sounds (purring, rain on the window) and a "session complete" notification
+- Edit or delete subjects, and copy logged-out subjects into the account on first login
 - Day/night room that follows your real clock
 - More behaviours for the Phaser cat (chasing a falling leaf, napping in a sunbeam)
 - Unlockable room decorations as study rewards
