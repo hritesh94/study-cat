@@ -1,0 +1,580 @@
+{
+  "scaleNote": "All room art is drawn at the same scale as the cat sheets: draw it with the same sprite scale as the cat (0.5 in the current game) so sizes match.",
+  "items": {
+    "shelf": {
+      "file": "room/shelf.png",
+      "width": 152,
+      "height": 23,
+      "origin": {
+        "x": 0.5,
+        "y": 0.3478
+      },
+      "originPx": {
+        "x": 76,
+        "y": 8
+      },
+      "note": "Wall shelf. Its origin is the middle of the plank's top surface: put each book's origin on the same point, moved left/right along the shelf.",
+      "usableWidthPx": 137
+    },
+    "book_0_cover": {
+      "file": "room/book_0_cover.png",
+      "width": 12,
+      "height": 41,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8537
+      },
+      "originPx": {
+        "x": 6,
+        "y": 35
+      },
+      "note": "Book cover for 0+ hours. Light grey on purpose: setTint(subjectColor) colors it.",
+      "hours": 0,
+      "thicknessPx": 5.9
+    },
+    "book_0_pages": {
+      "file": "room/book_0_pages.png",
+      "width": 10,
+      "height": 10,
+      "origin": {
+        "x": 0.5,
+        "y": 3.4
+      },
+      "originPx": {
+        "x": 5,
+        "y": 34
+      },
+      "note": "Page edges for the same book. Draw on top of the cover, NOT tinted.",
+      "hours": 0
+    },
+    "book_1_cover": {
+      "file": "room/book_1_cover.png",
+      "width": 14,
+      "height": 39,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8462
+      },
+      "originPx": {
+        "x": 7,
+        "y": 33
+      },
+      "note": "Book cover for 1+ hours. Light grey on purpose: setTint(subjectColor) colors it.",
+      "hours": 1,
+      "thicknessPx": 7.8
+    },
+    "book_1_pages": {
+      "file": "room/book_1_pages.png",
+      "width": 12,
+      "height": 10,
+      "origin": {
+        "x": 0.5,
+        "y": 3.2
+      },
+      "originPx": {
+        "x": 6,
+        "y": 32
+      },
+      "note": "Page edges for the same book. Draw on top of the cover, NOT tinted.",
+      "hours": 1
+    },
+    "book_2_cover": {
+      "file": "room/book_2_cover.png",
+      "width": 16,
+      "height": 41,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8537
+      },
+      "originPx": {
+        "x": 8,
+        "y": 35
+      },
+      "note": "Book cover for 3+ hours. Light grey on purpose: setTint(subjectColor) colors it.",
+      "hours": 3,
+      "thicknessPx": 9.8
+    },
+    "book_2_pages": {
+      "file": "room/book_2_pages.png",
+      "width": 14,
+      "height": 10,
+      "origin": {
+        "x": 0.5,
+        "y": 3.4
+      },
+      "originPx": {
+        "x": 7,
+        "y": 34
+      },
+      "note": "Page edges for the same book. Draw on top of the cover, NOT tinted.",
+      "hours": 3
+    },
+    "book_3_cover": {
+      "file": "room/book_3_cover.png",
+      "width": 18,
+      "height": 39,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8462
+      },
+      "originPx": {
+        "x": 9,
+        "y": 33
+      },
+      "note": "Book cover for 8+ hours. Light grey on purpose: setTint(subjectColor) colors it.",
+      "hours": 8,
+      "thicknessPx": 12.2
+    },
+    "book_3_pages": {
+      "file": "room/book_3_pages.png",
+      "width": 16,
+      "height": 10,
+      "origin": {
+        "x": 0.5,
+        "y": 3.1
+      },
+      "originPx": {
+        "x": 8,
+        "y": 31
+      },
+      "note": "Page edges for the same book. Draw on top of the cover, NOT tinted.",
+      "hours": 8
+    },
+    "book_4_cover": {
+      "file": "room/book_4_cover.png",
+      "width": 20,
+      "height": 40,
+      "origin": {
+        "x": 0.5,
+        "y": 0.85
+      },
+      "originPx": {
+        "x": 10,
+        "y": 34
+      },
+      "note": "Book cover for 20+ hours. Light grey on purpose: setTint(subjectColor) colors it.",
+      "hours": 20,
+      "thicknessPx": 15.1
+    },
+    "book_4_pages": {
+      "file": "room/book_4_pages.png",
+      "width": 18,
+      "height": 10,
+      "origin": {
+        "x": 0.5,
+        "y": 3.3
+      },
+      "originPx": {
+        "x": 9,
+        "y": 33
+      },
+      "note": "Page edges for the same book. Draw on top of the cover, NOT tinted.",
+      "hours": 20
+    },
+    "book_5_cover": {
+      "file": "room/book_5_cover.png",
+      "width": 24,
+      "height": 39,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8462
+      },
+      "originPx": {
+        "x": 12,
+        "y": 33
+      },
+      "note": "Book cover for 50+ hours. Light grey on purpose: setTint(subjectColor) colors it.",
+      "hours": 50,
+      "thicknessPx": 18.5
+    },
+    "book_5_pages": {
+      "file": "room/book_5_pages.png",
+      "width": 22,
+      "height": 10,
+      "origin": {
+        "x": 0.5,
+        "y": 3.2
+      },
+      "originPx": {
+        "x": 11,
+        "y": 32
+      },
+      "note": "Page edges for the same book. Draw on top of the cover, NOT tinted.",
+      "hours": 50
+    },
+    "jar_00": {
+      "file": "room/jar_00.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 0% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.0
+    },
+    "jar_01": {
+      "file": "room/jar_01.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 10% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.1
+    },
+    "jar_02": {
+      "file": "room/jar_02.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 20% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.2
+    },
+    "jar_03": {
+      "file": "room/jar_03.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 30% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.3
+    },
+    "jar_04": {
+      "file": "room/jar_04.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 40% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.4
+    },
+    "jar_05": {
+      "file": "room/jar_05.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 50% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.5
+    },
+    "jar_06": {
+      "file": "room/jar_06.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 60% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.6
+    },
+    "jar_07": {
+      "file": "room/jar_07.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 70% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.7
+    },
+    "jar_08": {
+      "file": "room/jar_08.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 80% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.8
+    },
+    "jar_09": {
+      "file": "room/jar_09.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 90% full (today's coins / daily cap). Use the closest level.",
+      "fill": 0.9
+    },
+    "jar_10": {
+      "file": "room/jar_10.png",
+      "width": 46,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 23,
+        "y": 56
+      },
+      "note": "Coin jar 100% full (today's coins / daily cap). Use the closest level.",
+      "fill": 1.0
+    },
+    "jar_sparkle_0": {
+      "file": "room/jar_sparkle_0.png",
+      "width": 64,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 32,
+        "y": 56
+      },
+      "note": "Sparkle overlay for a full jar. Loop frames 0-3 at about 6 fps on top of jar_10."
+    },
+    "jar_sparkle_1": {
+      "file": "room/jar_sparkle_1.png",
+      "width": 64,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 32,
+        "y": 56
+      },
+      "note": "Sparkle overlay for a full jar. Loop frames 0-3 at about 6 fps on top of jar_10."
+    },
+    "jar_sparkle_2": {
+      "file": "room/jar_sparkle_2.png",
+      "width": 64,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 32,
+        "y": 56
+      },
+      "note": "Sparkle overlay for a full jar. Loop frames 0-3 at about 6 fps on top of jar_10."
+    },
+    "jar_sparkle_3": {
+      "file": "room/jar_sparkle_3.png",
+      "width": 64,
+      "height": 64,
+      "origin": {
+        "x": 0.5,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 32,
+        "y": 56
+      },
+      "note": "Sparkle overlay for a full jar. Loop frames 0-3 at about 6 fps on top of jar_10."
+    },
+    "plant_0_seed": {
+      "file": "room/plant_0_seed.png",
+      "width": 34,
+      "height": 37,
+      "origin": {
+        "x": 0.5,
+        "y": 0.7838
+      },
+      "originPx": {
+        "x": 17,
+        "y": 29
+      },
+      "note": "Plant stage 0 (seed).",
+      "stage": 0
+    },
+    "plant_1_sprout": {
+      "file": "room/plant_1_sprout.png",
+      "width": 34,
+      "height": 48,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8333
+      },
+      "originPx": {
+        "x": 17,
+        "y": 40
+      },
+      "note": "Plant stage 1 (sprout).",
+      "stage": 1
+    },
+    "plant_1_sprout_droopy": {
+      "file": "room/plant_1_sprout_droopy.png",
+      "width": 35,
+      "height": 40,
+      "origin": {
+        "x": 0.4857,
+        "y": 0.8
+      },
+      "originPx": {
+        "x": 17,
+        "y": 32
+      },
+      "note": "Plant stage 1 after the streak broke (droopy, pale).",
+      "stage": 1,
+      "droopy": true
+    },
+    "plant_2_leafy": {
+      "file": "room/plant_2_leafy.png",
+      "width": 43,
+      "height": 64,
+      "origin": {
+        "x": 0.4884,
+        "y": 0.875
+      },
+      "originPx": {
+        "x": 21,
+        "y": 56
+      },
+      "note": "Plant stage 2 (leafy).",
+      "stage": 2
+    },
+    "plant_2_leafy_droopy": {
+      "file": "room/plant_2_leafy_droopy.png",
+      "width": 37,
+      "height": 53,
+      "origin": {
+        "x": 0.4595,
+        "y": 0.8491
+      },
+      "originPx": {
+        "x": 17,
+        "y": 45
+      },
+      "note": "Plant stage 2 after the streak broke (droopy, pale).",
+      "stage": 2,
+      "droopy": true
+    },
+    "plant_3_bushy": {
+      "file": "room/plant_3_bushy.png",
+      "width": 67,
+      "height": 75,
+      "origin": {
+        "x": 0.5075,
+        "y": 0.8933
+      },
+      "originPx": {
+        "x": 34,
+        "y": 67
+      },
+      "note": "Plant stage 3 (bushy).",
+      "stage": 3
+    },
+    "plant_3_bushy_droopy": {
+      "file": "room/plant_3_bushy_droopy.png",
+      "width": 72,
+      "height": 58,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8621
+      },
+      "originPx": {
+        "x": 36,
+        "y": 50
+      },
+      "note": "Plant stage 3 after the streak broke (droopy, pale).",
+      "stage": 3,
+      "droopy": true
+    },
+    "plant_4_blooming": {
+      "file": "room/plant_4_blooming.png",
+      "width": 67,
+      "height": 75,
+      "origin": {
+        "x": 0.5075,
+        "y": 0.8933
+      },
+      "originPx": {
+        "x": 34,
+        "y": 67
+      },
+      "note": "Plant stage 4 (blooming).",
+      "stage": 4
+    },
+    "plant_4_blooming_droopy": {
+      "file": "room/plant_4_blooming_droopy.png",
+      "width": 72,
+      "height": 66,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8788
+      },
+      "originPx": {
+        "x": 36,
+        "y": 58
+      },
+      "note": "Plant stage 4 after the streak broke (droopy, pale).",
+      "stage": 4,
+      "droopy": true
+    },
+    "tub": {
+      "file": "room/tub.png",
+      "width": 128,
+      "height": 128,
+      "origin": {
+        "x": 0.5,
+        "y": 0.8125
+      },
+      "originPx": {
+        "x": 64,
+        "y": 104
+      },
+      "note": "Bath tub. Same frame size and origin as the cat sheets: draw it at the cat's scale with origin (0.5, 0.8125) on the tub spot, then the bath_* animations line up exactly. Hide it while bath_in / bath / bath_shake / bath_out play (their frames include the tub)."
+    }
+  }
+}

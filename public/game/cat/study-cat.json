@@ -201,6 +201,76 @@
       "fps": 12,
       "loop": false,
       "note": "crouch, leap, tuck, land (move the sprite in the engine)"
+    },
+    "eat_start": {
+      "start": 220,
+      "frames": 5,
+      "fps": 10,
+      "loop": false,
+      "note": "stand -> head down into the bowl (bowl in the frames)"
+    },
+    "eat_end": {
+      "start": 230,
+      "frames": 5,
+      "fps": 10,
+      "loop": false,
+      "note": "eating -> stand"
+    },
+    "play_start": {
+      "start": 240,
+      "frames": 5,
+      "fps": 12,
+      "loop": false,
+      "note": "stand -> crouch at the yarn (yarn in the frames)"
+    },
+    "play_end": {
+      "start": 250,
+      "frames": 5,
+      "fps": 12,
+      "loop": false,
+      "note": "crouch -> stand"
+    },
+    "sad_start": {
+      "start": 260,
+      "frames": 5,
+      "fps": 8,
+      "loop": false,
+      "note": "sit -> sad"
+    },
+    "sad_end": {
+      "start": 270,
+      "frames": 5,
+      "fps": 8,
+      "loop": false,
+      "note": "sad -> sit"
+    },
+    "bath_in": {
+      "start": 280,
+      "frames": 5,
+      "fps": 10,
+      "loop": false,
+      "note": "lands in the tub (tub in the frames; play right after a jump)"
+    },
+    "bath": {
+      "start": 290,
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "note": "sitting in the bath, bubbles on its head"
+    },
+    "bath_shake": {
+      "start": 300,
+      "frames": 7,
+      "fps": 12,
+      "loop": false,
+      "note": "shakes the water off, droplets fly"
+    },
+    "bath_out": {
+      "start": 310,
+      "frames": 4,
+      "fps": 10,
+      "loop": false,
+      "note": "stands up in the tub and crouches to jump out (then play jump)"
     }
   }
 }
