@@ -3,8 +3,8 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app
-**Stack:** React 19 + Vite 8, with a 2D SVG cat and room (no 3D library)
-**Status:** Phase 1 complete, plus the cozy 2D redesign (no login, no backend)
+**Stack:** React 19 + Vite 8, with a rigged 2D SVG cat puppet and room (no 3D or animation library)
+**Status:** Phase 1 complete, plus the cozy 2D redesign and the rigged puppet (no login, no backend)
 
 ---
 
@@ -14,13 +14,13 @@ Everything built so far, in order, with simple explanations of what each piece d
 |---|---|
 | Pomodoro timer | Default 50 min study / 10 min break, both adjustable (study 1–180, break 1–60). Start, Pause, Reset, Skip. |
 | Auto phases | When study ends, the break starts by itself. When the break ends, the app waits for you to press Start. |
-| Storybook cat | A 2D cat drawn in SVG, with the head and body as one connected outline. It's always alive: it blinks, swishes its tail, and breathes slowly. |
-| Cozy room | Behind the cat: wooden floor, rug, desk, warm lamp, plant, a steaming mug, a framed paw print, and a window with leaves slowly falling outside. |
+| Puppet cat | A 2D cat in a 3/4 side view, built like a puppet: head, torso, 3-part tail, and legs with real joints. It's always alive: it breathes, blinks, twitches its ears and swishes its tail. |
+| Cozy room | Wooden floor, rug, a desk with a warm lamp, an open book, a pencil and a steaming mug, a stool, a plant, a framed paw print, and a window with leaves slowly falling outside. |
 | Mood lighting | **Study:** the room dims slightly, the lamp glows warmer, and it turns to dusk outside. **Break:** the room brightens and it's sunny. |
 | Focus view | While studying: fullscreen, and everything hidden except the cat, the room and the time. |
-| Study animations | While you study, the cat switches between **reading** (with page flips), **eating** and **watching** (it follows your mouse) every 15–25 s. |
-| Break mode | The cat says *"Enough studying, play with me!"* and shows **Play 🧶**, **Feed 🐟** and **Bathe 🫧**, each with its own reaction (hopping with yarn, munching with hearts, shaking off bubbles). |
-| Sad cat | Switch tabs during study and the cat goes sad (droopy ears and tail, sad brows, a tear). When you come back it complains, then forgives you after 4 s. |
+| Study actions | The cat hops onto the stool and switches every 15–25 s between: **reading** (head follows the lines), **turning a page** (the paw grabs the corner and the page flips), **writing** with a pencil, **sipping** from the mug with both paws, **chin on paw → yawn → stretch**, and **watching** you (turns toward your mouse). |
+| Break mode | The cat hops down to the rug and says *"Enough studying, play with me!"*. **Play 🧶** = bats the yarn with its front paws, **Feed 🐟** = eats from a bowl with its tail swishing, **Bathe 🫧** = sits in a little tub and shakes off bubbles. |
+| Sad cat | Switch tabs during study and the cat hunches on the stool: ears back, tail wrapped around its feet, sad brows, a tear. When you come back it complains, then forgives you after 4 s. |
 | Voice | The cat speaks short lines using the browser's built-in speech (Web Speech API). Mute button 🔊 in the top bar. |
 | Saved minutes | Today's study minutes are shown at the top and saved in `localStorage`, so they survive a reload. |
 | Saved settings | Your study/break lengths and mute choice are saved too. |
@@ -102,8 +102,31 @@ Files: `src/index.css`, `src/App.css`, `src/main.jsx`, `index.html`, `public/fav
 - **Panel layout:** on wide screens it's two columns (time | buttons) to stay short. Phones get one column and a taller floor.
 - **Title:** "Study Cat 🐱 · cozy study timer". **Favicon:** an SVG with the 🐱 emoji.
 
-### Step 11 — Docs + redeploy
+### Step 11 — Docs + redeploy · `b8a2530`
 This log was updated, then `npx vercel deploy --prod`.
+
+### Step 12 — Rigged puppet cat + pose system · `422955f`
+Files: `src/cat/poses.js`, `rig.js`, `usePuppet.js`, `Cat.jsx`, `CatScene.jsx`, `cat.css`, `stage.css`
+The one-shape cat couldn't *do* things, so it was rebuilt like a paper puppet.
+
+- **The rig (`Cat.jsx`):** every moving part is its own `<g>`, drawn with its **joint at (0, 0)**. Its transform is `translate(to the joint) rotate(angle)`, so it spins around the joint. Children sit *inside* their parent's group (thigh → shin → paw), so when the thigh turns, the shin and paw come with it. Parts can never detach.
+  ```
+  root (hips) ─ tail1 → tail2 → tail3
+              ─ far back leg:  thigh → shin → paw
+              ─ far front leg: upper → forearm → paw
+              ─ torso → head → ears, eyes, mouth
+              ─ near back leg, near front leg (→ pencil)
+  ```
+  Draw order is depth: far legs first, near legs last. Far legs are a slightly darker orange.
+- **Poses (`poses.js`):** a pose is just numbers: `{ torso: 8, head: 14, tail: [40, 25, 30], ... }`. Instead of working out elbow and knee angles by hand, a leg can say *where its paw should be* (`reach: [466, 250]` = "the book's corner"). `rig.js` then solves the angles with **two-bone inverse kinematics**: the triangle math for "shoulder → elbow → paw".
+- **Actions:** an action is a list of steps: *move to this pose in `dur` seconds, then `hold`*. For example, **page turn** = read → reach the corner → grab → lift (the page is half-flipped) → put it down (the page lands) → read. To add an action, write a few poses and one list, with no new animation code.
+- **The animator (`usePuppet.js`):** about 60 times a second it blends from where the cat *was* toward the next pose (with `easeInOut`, so moves start and stop softly). It adds idle life on top: breathing, random blinks, ear twitches, and a tail swish that travels down the 3 segments. Then it writes the transforms straight onto the SVG, so React never re-renders.
+- **Living loops:** a pose can have a `motion` function, e.g. reading slowly sweeps the head and eyes across a line, writing scribbles the pencil, and watching reads the mouse position.
+- **One stage:** the desk, stool, book, mug, rug, bowl, yarn and tub moved into the *same* SVG as the cat (800 × 520 units), so a paw target like `[494, 244]` is exactly the mug. The room behind it (wall, window, plant, floor) stays as before.
+- **Hopping:** when an action moves the cat between the stool and the floor, the animator makes it an arc (a hop) instead of a slide.
+- **Props follow the story:** the desk pencil disappears when the paw picks it up, the mug moves to the cat's mouth, and the page flips with the paw.
+- **Try it yourself:** while `npm run dev` is running, open the browser console and type `studyCat.play('pageTurn')`, or any action or pose name from `poses.js`.
+- `App.jsx`, `hooks/` and `components/` are unchanged. The old name `eating` still works: it now plays `sipping`.
 
 ---
 
@@ -130,13 +153,17 @@ study-cat/
    │  └─ BreakPanel.jsx      Play / Feed / Bathe buttons + their lines
    ├─ cat/
    │  ├─ catConfig.js        the list of animation names (the "contract")
-   │  ├─ Cat.jsx             the SVG cat drawing + mouse tracking
-   │  ├─ cat.css             every pose, loop and prop, per animation
-   │  ├─ CatScene.jsx        room + cat together (what App.jsx renders)
-   │  └─ useStudyCycle.js    rotates the study animations
+   │  ├─ poses.js            ★ rig sizes, every pose, every action — edit here
+   │  ├─ rig.js              the math: inverse kinematics, blending, easing
+   │  ├─ usePuppet.js        the animator loop + idle life (breathe/blink/…)
+   │  ├─ Cat.jsx             the puppet drawing: one <g> per jointed part
+   │  ├─ cat.css             fur, outlines, eye/mouth expressions
+   │  ├─ CatScene.jsx        room + the stage (desk, stool, props, cat)
+   │  ├─ stage.css           stage paints, lamp glow, study/break lighting
+   │  └─ useStudyCycle.js    rotates the study actions
    └─ scene/
-      ├─ Room.jsx            window, plant, desk, lamp, mug, floor, rug
-      └─ room.css            room layout, leaves/steam, study/break lighting
+      ├─ Room.jsx            wall, window with falling leaves, plant, floor
+      └─ room.css            room layout + study/break dimming
 ```
 
 ### Palette
@@ -176,13 +203,14 @@ To reset everything, open the browser console on the site and run `localStorage.
 
 ## 5. How it was tested
 
-Redesign checked in the browser at desktop (800×600) and phone (375×812) sizes:
-- ✅ All 8 animations render: idle, reading, eating, watching, sad, play, feed, bathe
-- ✅ Watching cat leans toward the mouse
-- ✅ Play and Bathe triggered through the real break buttons
-- ✅ Sad cat through the real tab-switch logic (event simulated)
-- ✅ Study: room dims, lamp warms, dusk sky. Break: room brightens.
-- ✅ Phone layout: cat, panel and room fit without overlapping
+Puppet checked in the browser at 1280×800, 800×600 and phone (375×812) sizes:
+- ✅ Every study pose inspected up close: reading, page reach / flip / land, pencil pick-up, writing, thinking (pencil to chin), mug reach + sip with both paws, chin rest, yawn, stretch, watching (mouse on both sides)
+- ✅ Every break pose: sitting on the rug, batting the yarn, eating from the bowl (with hearts), bathing in the tub
+- ✅ Sad: hunched on the stool, ears back, tear, tail wrapped in front of the feet (via the real tab-switch logic, event simulated)
+- ✅ Hop between stool and rug when study starts and when the break starts (real Start / Skip buttons)
+- ✅ All 12 names in `catConfig.js` resolve to actions; all 22 poses give valid angles
+- ✅ Speech bubble follows the cat's head on the stool and on the rug
+- ✅ Phone: break panel fits under the cat (buttons stay on one row)
 - ✅ No console errors; lint and build clean; `App.jsx`, `hooks/` and `components/` unchanged
 - ⚠️ The spoken voice wasn't listened to (muted during testing). Try it yourself; voices differ by browser.
 
@@ -195,18 +223,25 @@ Redesign checked in the browser at desktop (800×600) and phone (375×812) sizes
 - Speech voices vary by browser/OS, and some browsers need a click before audio plays.
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
 - The cat only follows the mouse, not touch (on phones it just looks ahead).
+- On narrow phones the edges of the stage are cropped (the far end of the desk, the book stack).
+- Movements are hand-tuned poses, so some hand-offs (like grabbing the pencil) are a quick fade rather than a true grip.
 
 ---
 
-## 7. Changing the cat's art later
+## 7. Adding a new action (example: "wave")
 
-The rest of the app only knows the animation names in `src/cat/catConfig.js`.
-To restyle or replace the cat (different SVG, a sprite sheet, Lottie...):
-1. Keep `Cat.jsx` accepting `animation` with those same names.
-2. Change the drawing in `Cat.jsx` and the poses in `cat.css`.
-3. App.jsx doesn't need to change.
+1. In `src/cat/poses.js`, add a pose (copy a similar one and change a few numbers):
+   ```js
+   wave: { ...readStill, head: -6, armN: { reach: [400, 170], paw: -80 }, eyes: 'happy' },
+   ```
+2. Add the action (a list of steps):
+   ```js
+   waving: { steps: [{ pose: 'wave', dur: 0.4, hold: 0.3 }, { pose: 'readStill', dur: 0.4 }] },
+   ```
+3. Try it: `studyCat.play('waving')` in the browser console (dev server only).
+4. To use it in the app, add `'waving'` to `CAT_ANIMATIONS` (and to `STUDY_IDLES` if it's a study action).
 
-To add a **new** animation: add its name to `CAT_ANIMATIONS`, add `.cat--yourname` rules in `cat.css`, then use the name in App.jsx.
+Tips: angles are degrees, `0` = hanging straight down, negative = forward. Use `reach` / `foot` targets in stage coordinates (800 × 520) when a paw needs to touch something.
 
 ---
 
@@ -216,4 +251,5 @@ To add a **new** animation: add its name to `CAT_ANIMATIONS`, add `.cat--yournam
 - History chart and study streaks (the per-day data is already being saved)
 - Sounds (purring, meows, rain on the window) and a "session complete" notification
 - Day/night room that follows your real clock
+- More actions (stretching on the rug, napping on the desk, chasing a falling leaf)
 - Unlockable room decorations as study rewards

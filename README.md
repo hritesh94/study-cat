@@ -29,16 +29,18 @@ src/
     BreakPanel.jsx        Play / Feed / Bathe buttons
   cat/
     catConfig.js          the animation names (the cat's "contract")
-    Cat.jsx               the SVG cat + mouse tracking
-    cat.css               every pose and loop, per animation
-    CatScene.jsx          room + cat together
-    useStudyCycle.js      rotates reading → eating → watching while you study
+    poses.js              rig sizes, every pose and action (edit here!)
+    rig.js                inverse kinematics + blending math
+    usePuppet.js          the animator: pose blending + idle life
+    Cat.jsx               the puppet: one <g> per jointed body part
+    CatScene.jsx          room + stage (desk, stool, props, cat)
+    useStudyCycle.js      rotates the study actions while you focus
   scene/
-    Room.jsx              window, plant, desk, lamp, mug, floor, rug
-    room.css              room layout, falling leaves, study/break lighting
+    Room.jsx              wall, window, plant, floor
 ```
 
-## Changing the cat
+## Adding cat actions
 
-The app only ever asks the cat to "play animation X" (names in `src/cat/catConfig.js`).
-Redraw the cat in `Cat.jsx` / `cat.css` and keep those names, and nothing else needs to change.
+The cat is a rigged SVG puppet. Poses are joint angles (or paw targets) in `src/cat/poses.js`,
+and actions are short lists of poses. See "Adding a new action" in [PROJECT_LOG.md](PROJECT_LOG.md).
+While `npm run dev` runs, try `studyCat.play('pageTurn')` in the browser console.
