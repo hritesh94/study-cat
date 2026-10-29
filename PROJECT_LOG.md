@@ -3,9 +3,9 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, the real room art, and the cat's AI)
-**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`, `ai-core`)
+**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`, `ai-core`, `adaptive-cat`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is merged and live too
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is merged and live too. Personalities and the cat learning you (step 22) are on branch `adaptive-cat`, not merged yet
 
 ---
 
@@ -34,6 +34,8 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Goals and roadmap (step 21) | NEET UG, JEE Main (built-in syllabus), boards or anything else. The AI plans the chapter order, hours, phases and milestones; the app plans the days. A daily goal ring in the top bar, +15 coins and a 👑 when it's full. |
 | Break quiz (step 21) | "Quiz me" after a session: 3 questions in the cat's bubble, +5 coins for finishing. |
 | Weekly report (step 21) | Every Monday: last week's hours, subjects, best day, streak and roadmap progress, with a few words and a tip from the cat. |
+| Personalities (step 22) | ⚙️ Settings: **Sweet**, **Diva**, **Gang** or **Savage** (how the cat talks), English or Hinglish, and spicy lines (with swearing) if you want them. Strictness is separate: Chill / Normal / Strict. |
+| The cat learns you (step 22) | If you let it: short study notes from your chats (goals, what helps, how you talk), and a fresh pack of lines every day in your personality. See, edit or delete it all in ⚙️ → What the cat knows about me. |
 | Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
 | Voice | "Cat babble" (2b): each line types into the speech bubble while the cat babbles it in quick, soft, high blips, made live with the Web Audio API (happy = higher and bouncy, sad = lower and slower, annoyed = short and sharp). A recording at `public/voice/<line-id>.mp3` plays instead, if there is one. Mute 🔊 in the top bar (in ⚙️ Settings on phones), plus a volume slider in ⚙️ Settings. |
 | Saved minutes | Today's study minutes are shown at the top. Logged in they come from the server; logged out they're saved in `localStorage`, so they survive a reload. |
@@ -556,6 +558,99 @@ Tried for real on localhost (chat, a NEET PG goal and its roadmap), then merged 
 6. Type "I feel hopeless" in the chat: a serious reply and the helplines.
 7. Check your usage in Google AI Studio after a day or two: if the free tier is too tight, lower the limits in `game_settings`.
 
+### Step 22 — An adaptive cat: personalities, and the cat learns you · built on branch `adaptive-cat` (not merged or deployed yet)
+Commits: `1558f6d` part 1.1 (settings), `0cb61f2` part 1.2–1.4 (lines), `6ea626b` part 1.5–1.6 (picker, voice), `8f63e94` part 2 server (memory, packs), `1f6e2ff` part 2 app (panel, packs).
+
+#### When you're ready to try it (in this order)
+1. **Paste 2 more SQL files** in Supabase → SQL Editor (files 1–12 are already in):
+   13. `supabase/migrations/20261030000013_personality.sql`
+   14. `supabase/migrations/20261030000014_cat_memory.sql`
+2. **Then deploy the functions** (6 now: chat, roadmap, quiz, report, **memory**, **pack**): `npx supabase functions deploy --use-api`.
+   Paste first: the new function code reads the new columns, so deploying before pasting would break the chat.
+
+They only add things. The live site keeps working after you paste them (it just doesn't use them yet).
+
+#### Part 1 — Personalities
+1. **Two separate settings now:**
+   - **Personality** (`profiles.personality`): `sweet` (default), `diva`, `gang`, `savage`. It changes only how the cat talks.
+   - **Strictness**: the old study modes, shown as **Chill / Normal / Strict**. The database still calls them easy / medium / toxic, and the server's penalty rules didn't change at all.
+   - Migration 13 also adds `language` (`en` / `hinglish`) and `spicy` (off by default). You can change all three, on your own row only. Logged out, they're saved in the browser (`studycat:catStyle`).
+2. **The lines are organised by personality × language × situation** (`src/game/catLines.js`):
+   - **Situations:** greet, session_start, mid_session, leave, come_back, forgive, finish_full, quit_early, break_start, streak_milestone, coin_cap, streak_broken. A few shared lines stay the same for every personality: meows, the Play / Feed / Bathe reactions, coins, book mode, goals and quiz.
+   - **SPICY** lines (with swearing) only play when spicy is on. `{n}` is the streak in days.
+   - **Every old id still works**, so recordings still match: the old lines are now the Sweet lines. The old "Toxic" lines are marked **STRICT**: Sweet uses them only on Strict, so a Sweet cat on Chill or Normal stays gentle, and Strict users hear exactly what they used to.
+   - `pickLine(situation, { personality, language, spicy, strict, pack, n })` picks today's AI pack first. Otherwise it takes the best fixed match: this personality and language, then this personality in English, then Sweet.
+   - **When the new situations play in the app:**
+     - *mid_session:* every 20–30 minutes while you study
+     - *leave*, then *come_back:* the telling-off when you return, then a welcome back a few seconds later
+     - *break_start:* a few seconds after a session ends
+     - *streak_milestone:* at 3, 5, 7, 10, 14, 21, 30… days
+     - *streak_broken:* once a day, instead of the hello
+3. **Diva:** all **166** `DIVA_LINES` were merged with their ids, moods, spicy flags and words exactly as written (checked by code, line by line). `DIVA_AI_STYLE` is exported unchanged, and `diva-lines.js` was deleted.
+4. **Starter sets for Sweet, Gang and Savage:**
+   - Sweet got its new situations. Gang and Savage are new: at least 8 lines per situation in English and 5 in Hinglish, plus one spicy line per situation in English.
+   - Swearing appears only in spicy lines; a test checks it. No slurs.
+   - Savage roasts the habit ("Broke rehna hai kya? Padh le."), never the person.
+   - Each personality has a style guide shaped like `DIVA_AI_STYLE`. All four live in `supabase/functions/_shared/personalities.js`, so the app and the Edge Functions share one copy; catLines.js re-exports them.
+   - **Totals:** 931 lines (Sweet 354, Diva 166, Gang 168, Savage 168, shared 75). Gang and Savage are starters, to be replaced with your finished sets.
+5. **Settings (⚙️):**
+   - a personality picker with a sample line in each voice (in your language); tapping one makes the cat say it
+   - Language (English / Hinglish) and **Spicy lines (contains swearing)**
+   - Strictness, with its confirmation now saying what Strict costs ("Every trip away from the tab costs 5 coins")
+6. **`catVoice(profile)`** now builds the tone from:
+   - the personality's style guide and examples (the spicy versions only when spicy is on)
+   - the language and the spicy rule
+   - the student's name
+   - what the cat learned and the study numbers (part 2)
+   It's used for the chat, quiz, report and roadmap messages.
+   - **Safety still wins:** the safety rules are always last, and now also say "no slurs ever; never insult looks, body, intelligence, family or worth". In distress, the whole voice (personality, spicy, memory) is replaced by the serious one.
+
+#### Part 2 — The cat learns you
+1. **`cat_memory`** (one row per user, row security: only your own, and you may edit and delete it) has 5 short notes, 300 characters each:
+   - goals in your own words
+   - what motivates you
+   - what demotivates you
+   - how you talk (slang, language mix, emoji)
+   - study habits it noticed
+2. **After a chat has been quiet for 10 minutes**, the `memory` function updates those notes. That counts as 1 AI call, with 10 a day.
+   - The app asks 10 minutes after the last reply, and once when it opens. The server checks itself that the conversation really ended, and doesn't call the AI if there's nothing new.
+   - **Never learned from:** a conversation in which someone was in distress.
+   - **Dropped by code even if the AI writes it:** sentences about health or mental health, family, relationships, where you live, contacts or religion. Ordinary study words (Medicine, diseases) are fine for a NEET PG student, and so is "says bhai a lot".
+3. **`catVoice`** includes those notes and the study numbers, so the cat adapts its words to you within its personality. A Diva who writes in Hinglish gets Hinglish Diva.
+4. **Daily line pack:** once a day (on the first open, if learning is on), the `pack` function writes about 40 fresh lines in your personality, language, spicy setting and memory. That's 1 AI call a day.
+   - Every line is checked on the server (`_shared/lineRules.js`):
+     - at most 120 characters, and a real situation
+     - slurs and abuse are never allowed; swearing only with spicy on
+     - no insults about the person ("stupid", "loser"…)
+     - `{n}` only in streak milestones
+   - Packs are saved in `line_packs` (one per day). The app uses today's pack first, but only while it matches your current personality, language and spicy setting; otherwise it uses the fixed lines. Pack lines always use the babble voice.
+5. **"What the cat knows about me"** (⚙️ Settings, logged in):
+   - every note in plain words, to edit or delete one by one
+   - **Delete everything** (memory and packs)
+   - the **Let the cat learn about me** switch
+   - The chat asks once, in one friendly sentence ("Can I learn how you like to study, so I talk more like you?…"). Until you answer, it counts as off.
+   - **Off really means off:** no memory updates and no packs, only the fixed lines. The database itself refuses the server's writes to `cat_memory` and `line_packs` unless learning is on. Your own edits always work.
+6. **The distress rule always wins:** over personality, spicy and memory (see Part 1.6). Distress conversations are never learned from, and the crisis card still appears.
+
+#### Tested
+- `npm run test:ai`: **183 checks** (31 new for the lines and the voice, 27 for learning). They cover:
+  - every old id and every Diva line kept, the starter-set sizes, and no swearing outside spicy lines
+  - Sweet on Strict, Hinglish, the fallbacks, `{n}`, and the pack first
+  - catVoice per personality, language and spicy, memory in it only when given, and distress beating all of it
+  - learning off: no AI call, nothing saved (memory and packs); the 10-minute wait; nothing learned from distress; family and health details dropped
+  - pack checks (length, situations, swearing, insults, slurs, `{n}`), once a day
+- `npm run test:db`: **192 checks**, and all the old ones still pass. They cover:
+  - the new profile columns, the memory (10) and pack (1) limits
+  - row security on `cat_memory` and `line_packs`
+  - **learning off really stops updates:** the server's writes are refused (even switching off mid-way), your own edits still work
+  - one pack per day, editing and deleting
+- All 6 functions pass `deno check`.
+- **The screens** were tested with a fake Supabase in a separate headless Chrome, on desktop and phone: **30 new checks** plus the 63 earlier ones, with no console errors.
+  - picker and sample lines, Hinglish samples, spicy, Strictness labels
+  - the learning question, the pack line greeting you, and the memory panel (edit, delete, switch off, delete everything)
+  - That found and fixed the personality cards breaking on phones.
+- ⚠️ **Not tested:** real AI answers for the new voices, memory and packs, since the functions aren't deployed yet.
+
 ---
 
 ## 3. Project structure
@@ -579,8 +674,9 @@ study-cat/
 ├─ scripts/export-lines.mjs writes voice-lines.csv (npm run voice:lines)
 ├─ voice-lines.csv          every cat line with its id, for recording
 ├─ CREDITS.md               where every sound comes from (all CC0)
-├─ supabase/migrations/     the 12 SQL files to paste into Supabase, in order
-├─ supabase/functions/      the AI Edge Functions: chat, roadmap, quiz, report (+ _shared/)
+├─ supabase/migrations/     the 14 SQL files to paste into Supabase, in order
+├─ supabase/functions/      the AI Edge Functions: chat, roadmap, quiz, report, memory, pack (+ _shared/:
+│                           personalities.js = the 4 style guides, lineRules.js = checks for AI lines and memory)
 ├─ supabase/config.toml     Supabase CLI settings (the functions need a login)
 ├─ .env.local               your Supabase URL + publishable key (NOT committed)
 ├─ .env.example             the same names with no values (committed)
@@ -606,7 +702,7 @@ study-cat/
       ├─ RoomScene.js       the Phaser scene: room, cat + outfit, breeds, camera, lighting
       ├─ catBrain.js        ★ the cat's state machine (goals, tasks, scripts)
       ├─ catItems.js        ★ every breed and outfit, with names and (future) locks
-      ├─ catLines.js        ★ everything the cat says, each line with a stable id
+      ├─ catLines.js        ★ everything the cat says, by personality × language × situation, stable ids
       ├─ roomProgress.js    ★ bookshelf / coin jar / plant: positions, thresholds, which room.json image
       ├─ RoomProgressLayer.js draws them with the room art
       ├─ catAnims.js        each animation's start/end posture, chain route-finder, props drawn in frames
@@ -653,11 +749,11 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run preview` | Serves the built `dist/` locally, to check the release version |
 | `npm run lint` | Checks the code for common mistakes (oxlint) |
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
-| `npm run test:db` | Tests the Supabase migrations locally (pretend users, 163 checks) |
-| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (125 checks) |
+| `npm run test:db` | Tests the Supabase migrations locally (pretend users, 192 checks) |
+| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (183 checks) |
 | `npx supabase functions deploy --use-api` | Deploys the 4 AI functions (after `npx supabase login` and `link`) |
 | `npx supabase secrets list` | Shows which secrets are set (never their values) |
-| `npm run voice:lines` | Writes every cat line with its id to `voice-lines.csv` |
+| `npm run voice:lines` | Writes every cat line with its id, personality, language and situation to `voice-lines.csv` |
 | `npm run meows` | Re-makes the meow sounds in `public/sounds/` |
 | `npx vercel env ls` | Lists the environment variables on Vercel |
 | `git log --oneline` | Shows the commit history |
@@ -777,6 +873,11 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
   - The syllabus files are a snapshot: please double-check them against the official PDFs.
   - The schedule only knows "done" or "not done" per chapter, not half-done ones.
   - The weekly report's streak is today's streak, not the one at the end of that week.
+- **Personalities and learning (step 22):**
+  - Gang and Savage are starter sets, to be replaced with your finished ones. Diva's Hinglish has the 3–6 lines per situation it came with.
+  - There's one pack a day: if you change personality, language or spicy during the day, the cat uses its fixed lines until tomorrow's pack.
+  - A memory update happens while the app is open, 10 minutes after the chat goes quiet, or the next time you open it.
+  - The "roast the habit, never the person" check for AI lines is a word list: it catches the obvious insults, not every clever one. The style guides and the safety rules tell the AI the same.
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
 - A change of plan waits for the current move to finish (up to about 2 s for a long loop like `read`), on purpose, so the cat never snaps.
 - Phaser adds about 320 kB (gzipped) to download, plus ~0.6–0.8 MB for a breed sheet, ~0.05–0.35 MB for an outfit, and ~70 kB of room art. They load after the page, but the very first visit shows an empty room for a moment, and picking a new breed or outfit takes a moment the first time.
