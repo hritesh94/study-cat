@@ -376,3 +376,21 @@ button.book-toggle.on {
     gap: 0.35rem;
   }
 }
+
+/* ── "STUDY" tag + this session's subject ── */
+.phase-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.phase-subject {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 500;
+}

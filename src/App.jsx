@@ -7,6 +7,7 @@ import { GameCanvas } from './game/GameCanvas'
 import { lineById, pickLine } from './game/catLines'
 import { PrefsPanel } from './components/PrefsPanel'
 import { SessionSummary } from './components/SessionSummary'
+import { SubjectPicker } from './components/SubjectPicker'
 import { Settings } from './components/Settings'
 import { Wardrobe } from './components/Wardrobe'
 import { liveStreak } from './lib/supabase'
@@ -17,6 +18,7 @@ import { useLocalStorage } from './hooks/useLocalStorage'
 import { useProfile } from './hooks/useProfile'
 import { useStudySessions } from './hooks/useStudySessions'
 import { useStudyStats } from './hooks/useStudyStats'
+import { useSubjects } from './hooks/useSubjects'
 import { useWakeLock } from './hooks/useWakeLock'
 import { formatTime, useTimer } from './hooks/useTimer'
 import './App.css'
@@ -61,6 +63,11 @@ export default function App() {
     setLocalMode(mode)
     if (profile) updateProfile({ study_mode: mode })
   }
+
+  // ── Subjects: what you're studying (picked when a session starts) ──
+  const subjectsApi = useSubjects(profile?.id ?? null)
+  const [subjectId, setSubjectId] = useState(null) // this session's subject
+  const subject = subjectsApi.subjects.find((s) => s.id === subjectId) ?? null
 
   const sessionMs = useRef(0) // study time in this session (for the summary card)
   const skipping = useRef(false)
@@ -173,10 +180,11 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
   const prefsRef = useRef(null)
+  const subjectRef = useRef(null)
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
   const prefsButton = useRef(null)
@@ -186,14 +194,14 @@ export default function App() {
   })
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
-    const from = { account: accountButton, prefs: prefsButton }[openSheet.current] ?? myCatButton
+    const from = { account: accountButton, prefs: prefsButton, subject: startButton }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
   }, [])
   const toggleSheet = (name) => setSheet((open) => (open === name ? null : name))
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef], [])
 
   // ── Study sessions on the server → coins + streak ──
   const [coinPop, setCoinPop] = useState(null)
@@ -202,6 +210,8 @@ export default function App() {
     enabled: !!profile,
     focusing,
     plannedMinutes: () => Math.ceil(timer.remainingMs / 60000),
+    // local (logged-out) subjects aren't on the server
+    subjectId: () => (subjectId && !subjectId.startsWith('local-') ? subjectId : null),
     leaveCount: leaves.current,
     onResult: (r) => {
       mergeProfile({ coins: r.coins, current_streak: r.current_streak, best_streak: r.best_streak, last_study_day: r.last_study_day })
@@ -249,7 +259,21 @@ export default function App() {
     return () => window.removeEventListener('pointerdown', greet)
   }, [])
 
+  // Start on a fresh study session asks for the subject first; resuming
+  // after Pause (or starting a break) goes straight on.
+  const startButton = useRef(null)
   const start = () => {
+    const fresh = timer.phase === 'study' && timer.remainingMs === settings.studyMinutes * 60000
+    if (fresh) setSheet('subject')
+    else startNow()
+  }
+  const startWith = (id) => {
+    setSheet(null)
+    setSubjectId(id)
+    subjectsApi.remember(id)
+    startNow()
+  }
+  const startNow = () => {
     if (timer.phase === 'study') {
       enterFullscreen()
       // a new study session: nothing counted yet
@@ -374,6 +398,15 @@ export default function App() {
 
       <CoinPop pop={coinPop} />
       <SessionSummary summary={summary} onClose={() => setSummary(null)} />
+      <SubjectPicker
+        ref={subjectRef}
+        open={sheet === 'subject'}
+        onClose={closeSheet}
+        subjects={subjectsApi.subjects}
+        preselected={subjectsApi.preselected}
+        onAdd={subjectsApi.add}
+        onStart={startWith}
+      />
 
       <PrefsPanel
         ref={prefsRef}
@@ -400,14 +433,24 @@ export default function App() {
       )}
 
       <main className="panel" ref={panelRef}>
-        <div className="phase">{timer.phase === 'study' ? 'Study' : 'Break'}</div>
+        <div className="phase-row">
+          <div className="phase">{timer.phase === 'study' ? 'Study' : 'Break'}</div>
+          {timer.phase === 'study' && subject && (timer.running || timer.remainingMs < settings.studyMinutes * 60000) && (
+            <div className="phase-subject" style={{ '--subject': subject.color }}>
+              <span className="subject-dot" aria-hidden="true" />
+              {subject.name}
+            </div>
+          )}
+        </div>
         <div className="time">{formatTime(timer.remainingMs)}</div>
         {timer.phase === 'break' && <BreakPanel onAction={doBreakAction} busy={catBusy} />}
         <div className="controls">
           {timer.running ? (
             <button onClick={pause}>Pause</button>
           ) : (
-            <button className="primary" onClick={start}>Start</button>
+            <button className="primary" onClick={start} ref={startButton}>
+              Start
+            </button>
           )}
           <button onClick={reset}>Reset</button>
           <button onClick={skip}>{timer.phase === 'study' ? 'Skip to break' : 'End break'}</button>

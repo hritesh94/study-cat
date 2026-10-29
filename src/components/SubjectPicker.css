@@ -1,0 +1,85 @@
+/* ── "What are you studying?" (the sheet itself is in Sheet.css) ── */
+.subject-picker {
+  max-width: 480px;
+  overflow-y: auto;
+}
+
+.subject-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+button.subject-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.8rem;
+  background: var(--paper);
+  font-weight: 500;
+}
+button.subject-chip.picked {
+  background: color-mix(in srgb, var(--subject, var(--sage)) 35%, var(--paper));
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+button.subject-chip.none,
+button.subject-chip.add {
+  color: var(--muted);
+}
+button.subject-chip.add {
+  border-style: dashed;
+}
+.subject-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--subject);
+  border: 2px solid var(--ink);
+}
+
+.subject-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.subject-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+.subject-form input {
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.7rem;
+}
+.subject-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+button.swatch {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 50%;
+}
+button.swatch.picked {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+.subject-form-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+.subject-error {
+  margin: 0;
+  color: #b4473c;
+  font-weight: 500;
+}
+
+button.subject-start {
+  align-self: center;
+  padding-left: 1.6rem;
+  padding-right: 1.6rem;
+}

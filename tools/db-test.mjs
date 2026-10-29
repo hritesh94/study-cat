@@ -211,6 +211,53 @@ check("Cat's coins equal the sum of her sessions", coinsC === dayC, `${coinsC} v
 r = await as(C, `update public.profiles set study_mode = 'easy', coins = 5000 where id = $1`, [C])
 check("changing the mode doesn't open the coins column", r.error?.includes('permission denied'), r.error ?? 'no error')
 
+console.log('\nSubjects')
+r = await as(A, `insert into public.subjects (name, color) values ('Maths', '#f2a66a') returning id, user_id`)
+const maths = r.rows[0]?.id
+check('Ana can add a subject, and it belongs to her', r.rows[0]?.user_id === A, r.error ?? '')
+r = await as(A, `insert into public.subjects (user_id, name, color) values ($1, 'Sneaky', '#f2a66a')`, [B])
+check("Ana can't add a subject for Ben", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(A, `insert into public.subjects (name, color) values ('maths', '#9cb59a')`)
+check('the same name twice is refused (ignoring capitals)', r.error?.includes('duplicate'), r.error ?? 'no error')
+r = await as(A, `insert into public.subjects (name, color) values ('Art', 'red')`)
+check('a colour must be like #a1b2c3', r.error?.includes('check'), r.error ?? 'no error')
+r = await as(A, `insert into public.subjects (name, color) values ('   ', '#f2a66a')`)
+check('an empty name is refused', r.error?.includes('check'), r.error ?? 'no error')
+r = await as(B, `select id from public.subjects`)
+check("Ben can't see Ana's subjects", r.rows.length === 0, r.error ?? '')
+r = await as(B, `update public.subjects set name = 'Hacked' where id = $1 returning id`, [maths])
+check("Ben can't rename Ana's subject", r.rows.length === 0)
+r = await as(B, `delete from public.subjects where id = $1 returning id`, [maths])
+check("Ben can't delete Ana's subject", r.rows.length === 0 && (await admin(`select count(*)::int as n from public.subjects where id = $1`, [maths]))[0].n === 1)
+r = await as(A, `update public.subjects set user_id = $2 where id = $1`, [maths, B])
+check("Ana can't hand her subject to Ben", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(null, `select id from public.subjects`)
+check('logged-out visitors see no subjects', r.error !== null || r.rows.length === 0)
+
+const withSubject = await as(A, `select public.start_session(25, $1) as id`, [maths])
+const sRow = (await admin(`select subject_id from public.study_sessions where id = $1`, [withSubject.rows[0]?.id]))[0]
+const used = (await admin(`select last_used_at from public.subjects where id = $1`, [maths]))[0]
+check('start_session stores the subject and marks it last used', sRow?.subject_id === maths && used.last_used_at !== null, withSubject.error ?? '')
+const bensSubject = (await as(B, `insert into public.subjects (name, color) values ('Bio', '#7fb3c9') returning id`)).rows[0].id
+const openBefore = (await admin(`select count(*)::int as n from public.study_sessions where user_id = $1 and ended_at is null`, [A]))[0].n
+r = await as(A, `select public.start_session(25, $1)`, [bensSubject])
+const openAfter = (await admin(`select count(*)::int as n from public.study_sessions where user_id = $1 and ended_at is null`, [A]))[0].n
+check("Ana can't start a session with Ben's subject (nothing changes)", r.error?.includes('Subject not found') && openBefore === openAfter, r.error ?? 'no error')
+r = await as(A, `select public.start_session(25) as id`)
+const noSubject = (await admin(`select subject_id from public.study_sessions where id = $1`, [r.rows[0]?.id]))[0]
+check('start_session without a subject still works', noSubject && noSubject.subject_id === null, r.error ?? '')
+await as(A, `select public.end_session($1, $2)`, [r.rows[0].id, today])
+r = await as(A, `delete from public.subjects where id = $1 returning id`, [maths])
+const kept = (await admin(`select subject_id from public.study_sessions where id = $1`, [withSubject.rows[0].id]))[0]
+check('deleting a subject keeps its sessions (subject becomes empty)', r.rows.length === 1 && kept.subject_id === null, r.error ?? '')
+await admin(`update public.game_settings set max_subjects = 2`)
+await as(C, `insert into public.subjects (name, color) values ('One', '#f2a66a'), ('Two', '#f2a66a')`)
+r = await as(C, `insert into public.subjects (name, color) values ('Three', '#f2a66a')`)
+check('at most max_subjects per user', r.error?.includes('at most 2'), r.error ?? 'no error')
+await admin(`update public.game_settings set max_subjects = 50`)
+r = await as(A, `select public.subjects_limit()`)
+check("users can't call the limit function", r.error !== null)
+
 console.log('\nEach user sees only their own sessions')
 const mine = await as(A, `select distinct user_id from public.study_sessions`)
 check('Ana only sees her sessions', mine.rows.length === 1 && mine.rows[0].user_id === A)
