@@ -230,7 +230,6 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `git log --oneline` | Shows the commit history |
 | `git status` | Shows what changed since the last commit |
 | `npx vercel deploy --prod` | Publishes the current code to the live URL |
-| `git switch main` / `git switch game-cat` | Jump between the deployed version and the Phaser version |
 | open `http://localhost:5173/?debug` | The cat debug panel |
 
 ---
