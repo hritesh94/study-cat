@@ -4,7 +4,10 @@
   /* below the top bar, above the cat (it can be tall, so it hangs down from here) */
   top: 4.4rem;
   transform: translateX(-50%);
-  width: min(400px, calc(100% - 32px));
+  --quiz-w: min(400px, calc(100vw - 32px));
+  width: var(--quiz-w);
+  /* near the cat, but never past the screen's edges */
+  left: clamp(calc(var(--quiz-w) / 2 + 16px), var(--cat-x), calc(100% - var(--quiz-w) / 2 - 16px));
   padding: 0.6rem 1rem 0.8rem;
   font-size: 1.15rem;
   text-align: left;
@@ -41,6 +44,9 @@
   border-radius: 10px;
   background: #fff;
   color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
 }
 .quiz-ask button {
   align-self: flex-start;

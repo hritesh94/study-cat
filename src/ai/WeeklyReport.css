@@ -1,7 +1,4 @@
 /* ── Weekly report ── */
-.weekly-report {
-  max-height: min(72vh, 560px);
-}
 .report-body {
   display: flex;
   flex-direction: column;

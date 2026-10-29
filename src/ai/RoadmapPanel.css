@@ -1,7 +1,4 @@
 /* ── Your roadmap ── */
-.roadmap-panel {
-  max-height: min(78vh, 640px);
-}
 .roadmap-body {
   display: flex;
   flex-direction: column;
@@ -168,5 +165,16 @@
   }
   .goal-ring {
     padding: 0.2rem 0.3rem;
+  }
+}
+
+/* no goal yet: "🎯 Set a goal" sits where the ring will be */
+.set-goal {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+}
+@media (max-width: 600px) {
+  .set-goal-label {
+    display: none;
   }
 }

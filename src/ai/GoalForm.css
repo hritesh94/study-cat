@@ -1,7 +1,4 @@
 /* ── Set a goal ── */
-.goal-form {
-  max-height: min(78vh, 640px);
-}
 
 .goal-fields {
   display: flex;
@@ -28,6 +25,9 @@
   background: var(--paper);
   color: var(--ink);
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
 }
 .goal-fields textarea {
   resize: vertical;

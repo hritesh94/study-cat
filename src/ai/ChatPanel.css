@@ -1,7 +1,4 @@
 /* ── Chat with the cat ── */
-.chat-panel {
-  max-height: min(70vh, 560px);
-}
 
 .chat-head-buttons {
   display: flex;

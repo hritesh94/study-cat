@@ -539,6 +539,19 @@ export default function App() {
               onClick={() => toggleSheet('roadmap')}
             />
           )}
+          {profile && goalApi.loaded && !studyGoal && (
+            <button
+              ref={ringButton}
+              className="set-goal"
+              onClick={() => openGoalForm(null)}
+              aria-expanded={sheet === 'goal'}
+              aria-label="Set a goal"
+              title="Set a goal"
+            >
+              <span aria-hidden="true">🎯</span>
+              <span className="set-goal-label"> Set a goal</span>
+            </button>
+          )}
           {profile && (
             <>
               <span className={`stat coins${coinBump ? ' bump' : ''}`} title="Coins" aria-label={`${profile.coins} coins`}>

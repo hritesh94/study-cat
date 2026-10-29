@@ -110,6 +110,21 @@ button.icon {
   .today {
     padding: 0.2rem 0.55rem;
   }
+  /* logged in there are more buttons (goal, coins, streak, chat…): the title
+     makes room (screen readers still hear it), and on very narrow phones
+     the buttons may wrap to a second row */
+  .topbar.signed-in h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .topbar.signed-in .topbar-right {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
 }
 @media (max-width: 420px) {
   .today-label {
