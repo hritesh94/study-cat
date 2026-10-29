@@ -12,11 +12,12 @@ import { Wardrobe } from './components/Wardrobe'
 import { liveStreak } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useCatVoice } from './hooks/useCatVoice'
-import { useLeaveTracker } from './hooks/useLeaveTracker'
+import { LEAVE_GRACE_MS, useLeaveTracker } from './hooks/useLeaveTracker'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useProfile } from './hooks/useProfile'
 import { useStudySessions } from './hooks/useStudySessions'
 import { useStudyStats } from './hooks/useStudyStats'
+import { useWakeLock } from './hooks/useWakeLock'
 import { formatTime, useTimer } from './hooks/useTimer'
 import './App.css'
 
@@ -85,18 +86,37 @@ export default function App() {
 
   const focusing = timer.phase === 'study' && timer.running
 
+  // ── Phones: keep the screen on while studying ──
+  // Book mode = you're reading on paper, so the screen may go to sleep:
+  // then the page being hidden doesn't count as leaving.
+  const [bookMode, setBookMode] = useLocalStorage('studycat:bookMode', false)
+  useWakeLock(focusing && !bookMode)
+  const toggleBookMode = () => {
+    const on = !bookMode
+    setBookMode(on)
+    if (on) voice.say(pickLine('book.on'))
+  }
+
   // ── Leaving the tab during study ──
   // The cat looks sad while you're away (Toxic: turns its back on you), then
-  // says something when you're back. The server turns the count into coins.
+  // says something when you're back. Under 15 seconds away doesn't count.
+  // The server turns the count into coins.
   const [away, setAway] = useState(null) // null | 'sad' | 'sulk'
   const cheerUp = useRef(null)
   const leaves = useLeaveTracker({
     active: focusing,
-    onLeave: () => {
+    bookMode,
+    onLeave: ({ book }) => {
       clearTimeout(cheerUp.current)
-      setAway(studyMode === 'toxic' ? 'sulk' : 'sad')
+      setAway(book ? null : studyMode === 'toxic' ? 'sulk' : 'sad')
     },
-    onReturn: ({ count }) => {
+    onReturn: ({ count, counted, book, awayMs }) => {
+      clearTimeout(cheerUp.current)
+      if (book) {
+        if (awayMs >= LEAVE_GRACE_MS) voice.say(pickLine('book.back'))
+        return
+      }
+      if (!counted) return setAway(null) // just a quick look away: all forgiven
       voice.say(leaveLine(studyMode, count, gameRules?.medium_free_leaves ?? 2))
       cheerUp.current = setTimeout(() => setAway(null), studyMode === 'toxic' ? 6000 : 4000)
     },
@@ -393,6 +413,10 @@ export default function App() {
           <button onClick={skip}>{timer.phase === 'study' ? 'Skip to break' : 'End break'}</button>
         </div>
         <Settings {...settings} onChange={setSettings} disabled={timer.running} />
+        {/* phones only (see App.css) */}
+        <button className={`book-toggle${bookMode ? ' on' : ''}`} onClick={toggleBookMode} aria-pressed={bookMode}>
+          <span aria-hidden="true">📖</span> Book mode: {bookMode ? 'on' : 'off'}
+        </button>
         {auth.enabled && auth.ready && !auth.user && (
           <p className="login-note">
             <button onClick={() => setSheet('account')}>Log in</button> to save progress and earn coins.

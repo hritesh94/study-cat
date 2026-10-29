@@ -31,18 +31,18 @@ export function useTimer({ studyMinutes, breakMinutes, onStudyTime, onPhaseChang
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studyMinutes, breakMinutes])
 
-  const begin = (ms) => {
-    const now = Date.now()
-    endAtRef.current = now + ms
-    lastTickRef.current = now
-    setRemainingMs(ms)
+  // `from` = when the phase really began (normally now)
+  const begin = (ms, from = Date.now()) => {
+    endAtRef.current = from + ms
+    lastTickRef.current = from
+    setRemainingMs(Math.max(0, from + ms - Date.now()))
     setRunning(true)
   }
 
   const goTo = useCallback(
-    (next, autoStart) => {
+    (next, autoStart, from) => {
       setPhase(next)
-      if (autoStart) begin(lengthOf(next))
+      if (autoStart) begin(lengthOf(next), from)
       else {
         setRunning(false)
         setRemainingMs(lengthOf(next))
@@ -69,7 +69,10 @@ export function useTimer({ studyMinutes, breakMinutes, onStudyTime, onPhaseChang
       if (left > 0) {
         setRemainingMs(left)
       } else if (phase === 'study') {
-        goTo('break', true) // study done → break starts by itself
+        // study done → break starts by itself. A locked phone may only wake
+        // us up much later: the break began when study ended (endAt), not
+        // now, and if it's already over too, the next tick ends it.
+        goTo('break', true, endAt)
       } else {
         goTo('study', false) // break done → wait for the user to press Start
       }
