@@ -10,9 +10,12 @@ export const LEAVE_GRACE_MS = 15000
 //   onReturn({ count, awayMs, counted, book }) → you're back; count = leaves this session
 //
 // book = book mode was on (reading on paper: the screen may sleep), so
-// that time away never counts. The count belongs to one study session:
-// call reset() when one starts. The server gets it at the end
-// (end_session's p_leave_count) and works out any coin penalty itself.
+// that time away never counts. forgive() takes the last leave back, for
+// "It was just the screen": browsers report a screen that was switched off
+// exactly like switching to another app, so only you know which it was.
+// The count belongs to one study session: call reset() when one starts.
+// The server gets it at the end (end_session's p_leave_count) and works
+// out any coin penalty itself.
 export function useLeaveTracker({ active, bookMode, onLeave, onReturn }) {
   const [count, setCount] = useState(0)
   const state = useRef({ count: 0, awayAt: null, book: false })
@@ -51,6 +54,15 @@ export function useLeaveTracker({ active, bookMode, onLeave, onReturn }) {
     state.current = { count: 0, awayAt: null, book: false }
     setCount(0)
   }, [])
+  // "it was just the screen": un-count the last leave
+  const forgive = useCallback(() => {
+    const t = state.current
+    if (t.count === 0) return false
+    t.count -= 1
+    setCount(t.count)
+    return true
+  }, [])
+
   // the count right now, for end_session (which may run while you're still
   // away, e.g. the study time ran out on a locked phone: that counts too
   // once it's past the grace period)
@@ -60,5 +72,5 @@ export function useLeaveTracker({ active, bookMode, onLeave, onReturn }) {
     return t.count + (stillAway ? 1 : 0)
   }, [])
 
-  return { count, reset, current }
+  return { count, reset, current, forgive }
 }

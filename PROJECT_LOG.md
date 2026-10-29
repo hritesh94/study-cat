@@ -337,6 +337,7 @@ They only add things. `end_session` and `start_session` are rebuilt with one ext
 - **Screen Wake Lock**: while studying, the screen is asked to stay on. Browsers drop the lock when the page is hidden, so it's asked for again when it's visible. If a browser doesn't support it (or says no, e.g. battery saver), nothing happens.
 - **📖 Book mode** (shown on touch screens, under the timer): the page going hidden doesn't count as leaving, the cat says it'll wait, and it says welcome back. The wake lock is off in book mode, since the screen may sleep.
 - **Grace period:** away for under **15 s** never counts, in any mode. If the study time runs out while you're still away, that absence counts once it's past 15 s.
+- **"It was just the screen":** browsers send a web page the same signal ("the page is hidden") whether you switched the screen off or went to another app, so the cat can't tell them apart. After a counted leave, a **📱 It was just the screen** button shows for 15 s. Tapping it takes that leave back (no penalty), the cat stops sulking and says a forgive line (15 per mode, `forgive.*` in `catLines.js`). On phones, a tip then offers to turn on Book mode.
 - **Locked phone:** phones pause the page's timers. The timer always compared against the real clock, but the break used to start from when you unlocked. Now it starts from when study really ended, and a break that also ran out moves on to Study by itself.
 
 #### Part 4 — Subjects (`useSubjects`, `SubjectPicker`, migration 5)
@@ -466,6 +467,7 @@ To reset everything, open the browser console on the site and run `localStorage.
 - ✅ `npm run test:db`: **89/89**, including the 44 from step 17 unchanged. New: modes (default easy, only 3 values, can't change someone else's, Easy costs nothing, Medium 2 free then 10% each, never below 0, Toxic 5 per leave, a negative count is treated as 0, the penalty comes off before the cap, the cap still holds, coins = sum of sessions, the mode grant doesn't open `coins`), subjects (own rows only, can't add for someone else or hand one over, duplicate / bad colour / empty name refused, the limit, `start_session` with your own subject only, deleting keeps sessions), and stats (totals match the sessions, per-subject minutes, only your rows, 62-day limit, logged out refused).
 - ✅ **Voice:** one babble blip per letter (20 blips for "Study buddies, assemble!"), meow sounds on the greeting and on a click, the volume slider, mute, and the line typing into the bubble. With a test file at `public/voice/start.easy.01.mp3`, that line played the file instead of babbling (the test file was removed).
 - ✅ **Modes** (leaving the tab simulated): Toxic asked "Are you sure?", the start line was a roast, the cat **sulked** while away, the return line was a roast, Pause got a "quitting" line, and the card said "left 1 time". Medium: a normal line on leave 1, a call-out on leave 2, penalty lines on 3 and 4. The mode is locked during a session.
+- ✅ **"It was just the screen"** (phone size, Toxic): after a 20 s absence the cat sulked and the button showed. Tapping it brought the cat back to reading with a forgive line, the leave was taken back (no "left" on the card), and the tip's **Turn it on** switched Book mode on.
 - ✅ **Phones:** a 5 s look-away didn't count and the cat went straight back to reading, 20 s counted, and in book mode a 60 s absence didn't count ("I waited, just like I said."). With a 1-minute session and the clock moved 70 s on (a locked phone), the break showed **09:49**, not 10:00. Moved past the whole break, it was back on Study, waiting for Start.
 - ✅ **Subjects:** add with a colour, duplicate name refused, picked one shown next to STUDY, preselected next time.
 - ✅ **Calendar** (with sample history): streak 4, best 4, 7.9 h this month (all correct by hand), 8 streak days with trails only between neighbours in the same week, day detail per subject, arrows, swipe, no future months. Fixed: on phones the Sunday column was cut off.
@@ -484,7 +486,7 @@ Run it locally (`npm run dev`) or on a Vercel preview, since `main` and the live
 6. Tap the 🔥 → today is green, tap it: Maths with its minutes, the coins and the sessions. "Today: N min" matches.
 7. The shelf shows a thin Maths book. The jar shows today's coins out of 300. The plant matches your streak.
 8. **B:** `await supabase.from('subjects').select('*')` → `[]` (none of A's). `await supabase.rpc('daily_totals', { p_from: '2026-10-01', p_to: '2026-10-31' })` → only B's days. B starts in Easy.
-9. **Phone:** open the Vercel preview on your phone, start studying and leave it: the screen should stay on. Lock it for a minute, unlock: the time is right. Turn on 📖 Book mode, lock it for 30 s: no leave counted.
+9. **Phone:** open the Vercel preview on your phone, start studying and leave it: the screen should stay on. Lock it for a minute, unlock: the time is right, the cat complains, and **📱 It was just the screen** takes it back. Turn on 📖 Book mode, lock it for 30 s: no leave counted.
 
 **Accounts (step 17)**
 - ✅ `npm run test:db`: 44/44 database checks with two simulated users (listed in step 17).
@@ -557,7 +559,8 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
 - A trickster can still move their "today" up to 1 day ahead, but that only uses up tomorrow's cap early. It can't add coins beyond the real minutes studied.
 - Clearing browser data erases your minutes.
 - Browsers need a tap before any sound plays, so the very first line (before you tap anything) is silent.
-- The leave count comes from the browser. Someone could send 0 to skip the Medium/Toxic penalties, but they can never get more than Easy gives, and the mode is their own choice anyway.
+- The leave count comes from the browser. Someone could send 0 (or tap "It was just the screen" after scrolling Instagram) to skip the Medium/Toxic penalties, but they can never get more than Easy gives, and the mode is their own choice anyway.
+- A web page can't tell "screen switched off" from "switched to another app" (Safari gives no way to know). That's why the button and Book mode exist.
 - The leave count is per server session, and Pause → Start begins a new one, so pausing resets the free trips in Medium.
 - On iPhones, the wake lock needs iOS 16.4 or newer. Older ones just let the screen sleep (use Book mode).
 - The bookshelf, coin jar and plant are placeholder shapes until the HD room art arrives (`src/game/roomProgress.js`).

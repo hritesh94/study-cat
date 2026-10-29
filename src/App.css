@@ -409,3 +409,35 @@ button.today {
 button.today {
   font-weight: 500;
 }
+
+/* ── "It was just the screen" (after a counted leave) ── */
+.forgive-card {
+  position: absolute;
+  top: 4.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem 0.7rem;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 0.35rem 0.45rem 0.35rem 0.9rem;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--wobbly);
+  box-shadow: 2px 3px 0 var(--ink-soft);
+  font-size: 0.92rem;
+  z-index: 3;
+  animation: summary-in 0.3s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+/* in the focus view the top bar is hidden, so the card can sit higher */
+.app.focus .forgive-card {
+  top: 1rem;
+}
+button.forgive-button {
+  padding: 0.25rem 0.8rem;
+  background: var(--sage-light);
+  font-size: 0.92rem;
+}

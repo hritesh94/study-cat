@@ -3,6 +3,7 @@ import { AccountPanel } from './components/AccountPanel'
 import { BreakPanel } from './components/BreakPanel'
 import { CoinIcon } from './components/CoinIcon'
 import { CoinPop } from './components/CoinPop'
+import { ForgiveCard } from './components/ForgiveCard'
 import { GameCanvas } from './game/GameCanvas'
 import { lineById, pickLine } from './game/catLines'
 import { PrefsPanel } from './components/PrefsPanel'
@@ -142,6 +143,7 @@ export default function App() {
   // The server turns the count into coins.
   const [away, setAway] = useState(null) // null | 'sad' | 'sulk'
   const cheerUp = useRef(null)
+  const [forgiveCard, setForgiveCard] = useState(null) // "It was just the screen
   const leaves = useLeaveTracker({
     active: focusing,
     bookMode,
@@ -158,9 +160,24 @@ export default function App() {
       if (!counted) return setAway(null) // just a quick look away: all forgiven
       voice.say(leaveLine(studyMode, count, gameRules?.medium_free_leaves ?? 2))
       cheerUp.current = setTimeout(() => setAway(null), studyMode === 'toxic' ? 6000 : 4000)
+      setForgiveCard({ id: Date.now(), kind: 'ask' })
     },
   })
   useEffect(() => () => clearTimeout(cheerUp.current), [])
+  useEffect(() => {
+    if (!forgiveCard) return
+    const hide = setTimeout(() => setForgiveCard(null), forgiveCard.kind === 'ask' ? 15000 : 10000)
+    return () => clearTimeout(hide)
+  }, [forgiveCard])
+  // the screen went off, it wasn't you: the leave is taken back (no penalty)
+  const forgiveLeave = () => {
+    if (!leaves.forgive()) return setForgiveCard(null)
+    clearTimeout(cheerUp.current)
+    setAway(null)
+    voice.say(pickLine('forgive', studyMode))
+    const phone = window.matchMedia?.('(pointer: coarse)').matches
+    setForgiveCard(phone && !bookMode ? { id: Date.now(), kind: 'tip' } : null)
+  }
 
   // ── The card after a study session ──
   const [summary, setSummary] = useState(null)
@@ -322,6 +339,7 @@ export default function App() {
       clearTimeout(cheerUp.current)
       setAway(null)
       setSummary(null)
+      setForgiveCard(null)
       voice.say(pickLine('start', studyMode))
     }
     timer.start()
@@ -445,6 +463,15 @@ export default function App() {
 
       <CoinPop pop={coinPop} />
       <SessionSummary summary={summary} onClose={() => setSummary(null)} />
+      <ForgiveCard
+        card={focusing ? forgiveCard : null}
+        onForgive={forgiveLeave}
+        onBookMode={() => {
+          setForgiveCard(null)
+          if (!bookMode) toggleBookMode()
+        }}
+        onClose={() => setForgiveCard(null)}
+      />
       <StreakCalendar
         ref={calendarRef}
         open={sheet === 'calendar'}
