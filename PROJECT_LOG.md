@@ -2,10 +2,10 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, and Phase 2b)
+**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, and the real room art)
 **Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations are on branch `room-art` (step 20), not merged yet
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too
 
 ---
 
@@ -374,7 +374,8 @@ Put this in both **Magic Link** and **Confirm signup** (a brand-new account gets
 <p>The code works for an hour. If you didn't ask for it, you can ignore this email.</p>
 ```
 
-### Step 20 — Real room art and the new cat animations · built on branch `room-art` (not merged or deployed yet)
+### Step 20 — Real room art and the new cat animations · built on branch `room-art`, merged into `main` and deployed
+Commits: `c99e1ce` the pack, `039c2c5` the code, merged in `139924f`. No database changes, so nothing to paste into Supabase.
 Files: `public/game/cat/*`, `public/game/room/*`, `tools/cat-generator-hd/*`, `src/game/catAnims.js`, `catBrain.js`, `RoomScene.js`, `roomProgress.js`, `RoomProgressLayer.js`, `layout.js`, `roomArt.js`, `src/lib/calendar.js`, `src/App.jsx`
 - **The pack, version 2** (`study-cat-hd-v2.zip`, deleted after unpacking):
   - `breeds/`, `outfits/` and `study-cat.json` replaced the ones in `public/game/cat/`. The sheets are now 1280 × 4096: **32 rows** (animations) instead of 22.
