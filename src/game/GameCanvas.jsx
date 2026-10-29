@@ -14,7 +14,7 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 //
 // Phaser is big, so it's loaded only when this component mounts
 // (`import()` makes Vite put it in its own file).
-export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, sheetRef, onBusy, onMeow }) {
+export function GameCanvas({ ref, goal, mood, look, onLookChange, coverRefs, onBusy, onMeow }) {
   const hostRef = useRef(null)
   const sceneRef = useRef(null)
   const bridge = useRef({})
@@ -37,6 +37,8 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, shee
 
   useImperativeHandle(ref, () => ({
     command: (task) => sceneRef.current?.brain.command(task),
+    // a happy moment (coins!): face you and meow, without the "Meow!" line
+    celebrate: () => sceneRef.current?.brain.poke({ silent: true }),
   }))
 
   // start the game once
@@ -68,11 +70,12 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, shee
       },
     })
 
-    // how much of the bottom of the screen the timer panel (or the open
-    // wardrobe, whichever reaches higher) covers
+    // how much of the bottom of the screen the timer panel (or an open
+    // sheet, whichever reaches higher) covers
     const measure = () => {
       if (!sceneRef.current) return
-      const tops = [panelRef.current, sheetRef?.current]
+      const tops = coverRefs
+        .map((r) => r.current)
         .filter((el) => el && el.offsetHeight > 0) // hidden = not covering anything
         .map((el) => el.getBoundingClientRect().top)
       if (tops.length) sceneRef.current.setInset(window.innerHeight - Math.min(...tops))
@@ -83,8 +86,7 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, shee
       measure()
     })
     observer.observe(host)
-    if (panelRef.current) observer.observe(panelRef.current)
-    if (sheetRef?.current) observer.observe(sheetRef.current)
+    for (const r of coverRefs) if (r.current) observer.observe(r.current)
     window.addEventListener('resize', measure)
 
     Promise.all([import('phaser'), import('./RoomScene')]).then(([{ default: Phaser }, { RoomScene }]) => {
@@ -115,7 +117,7 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, shee
       game?.destroy(true)
       sceneRef.current = null
     }
-  }, [panelRef, sheetRef])
+  }, [coverRefs])
 
   // follow the timer (unless the debug panel took over)
   useEffect(() => {
