@@ -372,6 +372,22 @@ export const LINE_GROUPS = {
     ['coins.cap.05', 'The coin jar is happy. More tomorrow!'],
     ['coins.cap.06', "That's today's limit. You did great."],
   ]),
+  // the daily goal from your roadmap is reached (+15 coins)
+  'goal.done': group('happy', [
+    ['goal.done.01', "You hit today's goal! I'm so proud of you."],
+    ['goal.done.02', "Today's goal: done! Here's a crown."],
+    ['goal.done.03', 'Goal reached! Purr purr purr.'],
+    ['goal.done.04', 'All of today’s minutes, done. You’re amazing!'],
+    ['goal.done.05', "Crown time! That's your daily goal."],
+    ['goal.done.06', 'You did everything you planned today. Wow.'],
+  ]),
+  // a break quiz is finished (+5 coins)
+  'quiz.done': group('happy', [
+    ['quiz.done.01', 'Quiz done! Your brain is warm now.'],
+    ['quiz.done.02', 'Three questions, all answered. Nice!'],
+    ['quiz.done.03', 'Quiz finished! Have some coins.'],
+    ['quiz.done.04', 'Smart human. Quiz complete!'],
+  ]),
   // book mode: the screen may sleep while you read on paper
   'book.on': group('neutral', [
     ['book.on.01', "Okay, go read your book. I'll wait right here."],

@@ -3,9 +3,9 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, and the real room art)
-**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`)
+**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`, `ai-core`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is on branch `ai-core`, not merged yet
 
 ---
 
@@ -30,6 +30,10 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Subjects (2b) | Starting a study session asks "What are you studying?": your last subject is already picked, or add one with a name and a colour. Saved to your account (or this browser when logged out). The subject shows next to the STUDY tag. |
 | Streak calendar (2b) | Tap the 🔥 (or the Today pill): a month view, each day in 4 shades of green by minutes, streak days joined by a flame trail, arrows and swipe to change month, tap a day for its minutes per subject, coins and sessions. The top shows your streak, best streak and this month's hours. |
 | Room progress (2b) | A wall shelf with one book per subject (thicker with more hours), a coin jar that fills with today's coins (sparkles when full), and a plant on the window sill that grows with your streak and droops when it breaks. Drawn with the sprite pack's room art: books tinted with each subject's colour, 11 jar levels, 5 plant stages and their droopy versions. |
+| Chat with the cat (step 21) | 💬 or tap the cat (logged in): the cat chats in 1–3 short sentences with your real study numbers. With no goal yet, it asks what you're studying for, one question at a time. Real distress gets a serious reply and helplines. |
+| Goals and roadmap (step 21) | NEET UG, JEE Main (built-in syllabus), boards or anything else. The AI plans the chapter order, hours, phases and milestones; the app plans the days. A daily goal ring in the top bar, +15 coins and a 👑 when it's full. |
+| Break quiz (step 21) | "Quiz me" after a session: 3 questions in the cat's bubble, +5 coins for finishing. |
+| Weekly report (step 21) | Every Monday: last week's hours, subjects, best day, streak and roadmap progress, with a few words and a tip from the cat. |
 | Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
 | Voice | "Cat babble" (2b): each line types into the speech bubble while the cat babbles it in quick, soft, high blips, made live with the Web Audio API (happy = higher and bouncy, sad = lower and slower, annoyed = short and sharp). A recording at `public/voice/<line-id>.mp3` plays instead, if there is one. Mute 🔊 in the top bar (in ⚙️ Settings on phones), plus a volume slider in ⚙️ Settings. |
 | Saved minutes | Today's study minutes are shown at the top. Logged in they come from the server; logged out they're saved in `localStorage`, so they survive a reload. |
@@ -418,6 +422,140 @@ Files: `public/game/cat/*`, `public/game/room/*`, `tools/cat-generator-hd/*`, `s
   - study → sad → study → break: **0 chain breaks**.
   - 9 room states: empty, half, full shelf, every droopy stage, and the sparkling jar.
 
+### Step 21 — The cat's AI: chat, goals and roadmap, break quiz, weekly report · built on branch `ai-core` (not merged or deployed yet)
+Commits: `d22bbe7` AI core, `479c7ca` part 1 (chat), `0a02724` part 2 (goals and roadmap), `a17a097` part 3 (quiz), `c1d0e72` part 4 (weekly report), `7002121` fixes from testing.
+
+#### Set it up, step by step (in your own terminal: PowerShell, in the study-cat folder)
+1. **Log the Supabase CLI in:** `npx supabase login`. It opens the browser; approve it there. (The CLI keeps that login on your computer; it's never in the repo.)
+2. **Link this folder to the project:** `npx supabase link --project-ref cnkdfgafyqpofnyzhqcb`. If it asks for the database password, you can leave it blank (functions and secrets don't need it).
+3. **Store the Gemini key as a Supabase secret, typed by you.** Never paste it into the chat, a file, `.env.local` or the code. This asks for it with hidden typing, so it doesn't end up in your command history either:
+   ```powershell
+   $key = Read-Host "Gemini API key" -AsSecureString; npx supabase secrets set "GEMINI_API_KEY=$([System.Net.NetworkCredential]::new('', $key).Password)"; Remove-Variable key
+   ```
+   Check with `npx supabase secrets list`: `GEMINI_API_KEY` is listed (as a fingerprint, not the key). Deployed functions pick up a changed secret without a redeploy.
+4. **Paste the 5 new SQL files** into Supabase → SQL Editor → New query → Run, one after the other, in this order (files 1–6 are already in):
+   7. `supabase/migrations/20261030000007_ai_core.sql`
+   8. `supabase/migrations/20261030000008_chat_goals.sql`
+   9. `supabase/migrations/20261030000009_roadmaps_bonus.sql`
+   10. `supabase/migrations/20261030000010_quizzes.sql`
+   11. `supabase/migrations/20261030000011_weekly_reports.sql`
+   12. `supabase/migrations/20261030000012_neet_pg.sql` (added later: allows NEET PG goals)
+
+   They're safe for the live site, which doesn't use them yet: they only add things. `end_session` keeps the same inputs, and `daily_totals` just gets one more column (the 👑).
+5. **Deploy the 4 Edge Functions** (chat, roadmap, quiz, report): `npx supabase functions deploy --use-api`. ✅ Done: steps 1–5 were done on 2026-10-30, and the chat answered. (`--use-api` builds them on Supabase's side, so Docker isn't needed.)
+6. **Check that they respond.** Without a login token, every function must refuse:
+   ```bash
+   curl -i -X POST https://cnkdfgafyqpofnyzhqcb.supabase.co/functions/v1/chat -H "Content-Type: application/json" -d "{\"message\":\"hi\"}"
+   ```
+   `HTTP/2 401` means it's deployed and locked. Then try it for real: `npm run dev` on this branch, log in, tap 💬 and say hi. If something's wrong, the details are in Supabase → Edge Functions → (the function) → Logs.
+
+The live app (on `main`) doesn't have the AI yet: it comes with the merge, after you've checked it.
+
+#### How it's built (security first)
+- **The key never leaves Supabase.** Only the Edge Functions (`supabase/functions/`) talk to the AI. They read `GEMINI_API_KEY` from the secret on the server. The browser sends your login token, never a key.
+- **Logged-in users only.** Supabase checks the login token before a function runs (`verify_jwt = true` in `supabase/config.toml`), and the function checks it again with Supabase Auth (`_shared/deno.js`). Without a valid login: 401. When the function reads the database, it does so *as you*, so Row Level Security applies.
+- **One small module picks the AI:** `_shared/providers/index.js`, chosen by the `AI_PROVIDER` secret (`gemini` when it's not set). Another provider just needs the same `generate()` function.
+- **The models, in one place:** `_shared/config.js`: `gemini-3.6-flash` first, `gemini-3.8-flash` as the backup. Both were checked on 2026-10-30 against Google's model list (stable) and pricing page ("Free of charge" on the free tier). 3.8 is the newest, but it answered "this model is currently experiencing high demand" to the first free-tier calls, so 3.6 goes first. They're called through `generateContent` (stateless: Google doesn't keep the conversation) with `thinkingLevel: "low"`. Flash can't switch thinking off, and thinking counts toward the output limit, so the limits leave room for it.
+- **Daily limits per user** (the free tier is shared by everyone): **30 chat messages, 3 roadmaps, 10 quizzes, 1 weekly report** a day, in `game_settings` (`ai_*_daily_limit`). The function reserves a call in `ai_usage` *before* asking the AI (`ai_reserve`, one atomic step), and gives it back if the AI fails (`ai_release`). Only the functions' server key may call those; if users could, they could give calls back forever. The day is the UTC day.
+- **When Google is busy:**
+  - A 429 (the rate limit) is retried once after 2.5 s.
+  - A 503 ("high demand"), or no answer within the time limit (chat 12 s, quiz 25 s, report 20 s, roadmap 55 s), goes straight to the backup model.
+  - When both are busy, the cat says "The cat is tired, try again in a minute.", and the chat shows "Still thinking…" while it waits.
+  - Google's reason is written to the function's logs (Supabase → Edge Functions → Logs).
+  - The first real chats hit exactly this: 3.8 was overloaded and "hello" took ages, then failed. The chat answered after the change.
+- **Input and output limits:** text fields up to 8,000 characters (chat box 2,000), syllabus photos shrunk in the browser to 1600 px JPEG and refused over 5 MB. Output tokens are capped per feature, and every AI answer is JSON that's checked field by field before it's used or saved.
+- **Every AI panel says "Don't paste private or personal information."**
+- **The cat's voice:** every system prompt is built by `systemPrompt()` (`_shared/prompts.js`), which starts with `catVoice(profile)` (`_shared/catVoice.js`): warm, cozy, short sentences. That's the one place where tone is decided; personalities can go there later.
+- **Safety, above everything:** the safety rules are always the *last* part of every prompt, so nothing above them (tone, a future personality) can override them. Code also checks each message for signs of real distress (`_shared/safety.js`: hopelessness, self-harm, wanting to die, in English and Hinglish) *before* the AI. In that case:
+  - the playful voice is swapped for a plain, serious one
+  - the app shows a **crisis card**: Tele-MANAS **14416** (or 1-800-891-4416), findahelpline.com for any country, and 112 in an emergency
+  - this works even when the daily limit is used up or the AI is down (a fixed, caring reply)
+  - the AI can raise the card too, for what the word list misses
+  - Idioms like "this chapter is killing me" don't trigger it; "I'm dumb" or "I'll fail" get warm cheering up instead.
+- **Errors never break the app:** `src/ai/client.js` turns every failure (no login, limit, tired, too big, offline, AI down, a bad answer) into something cute the cat says.
+
+#### Part 1 — Chat with the cat (`chat` function, `src/ai/ChatPanel.jsx`)
+- Tap 💬 in the top bar, or tap the cat (logged in, not while studying). The cat replies in 1–3 short sentences.
+- With every message the AI gets a little context, **calculated by code** (`_shared/stats.js`):
+  - the last 14 days: total minutes, average session, usual time of day (in your time zone), leaves per session, days studied
+  - the current streak, your goal, roadmap progress and next chapter, what the timer is doing
+  - the last 10 messages
+- **Onboarding:** with no goal yet, the cat asks one question at a time: what for, the deadline, hours a day, weak and strong subjects. Then the AI returns the goal as JSON (checked: a real future date, 0.5–16 h, known goal types). The app shows it to confirm ("Looks right" / "Change something"), saves it, and asks "Want me to build your roadmap?"
+- The cat may suggest one feature (roadmap, quiz, set a goal) per conversation (a 6-hour pause starts a new one). It shows as a button under its reply.
+- Messages are saved in `chat_messages`, written only by the function. **Clear chat** deletes them from the server too.
+
+#### Part 2 — Goals and roadmap (`roadmap` function, `src/ai/schedule.js`, `RoadmapPanel.jsx`, `GoalForm.jsx`)
+1. **Syllabus data:** `src/data/syllabus/neet.js` (72 chapters: Physics and Chemistry by official unit, Biology split into its NCERT chapters) and `jee-main.js` (54 units). Each chapter has an id, subject, name and a **rough** weightage (high / medium / low, from past papers, not official). Last checked 2026-10-30.
+   - Sources: the NMC's "Updated syllabus for NEET UG 2026" (nmc.org.in; Careers360 reported no chapters removed) and NTA's JEE Main 2026 syllabus (jeemain.nta.nic.in; unchanged since the 2024 cut).
+   - ⚠️ **Please double-check both against the official PDFs**: I couldn't open the PDFs themselves, and the 2027 syllabus may differ.
+   - **NEET PG** (added after the first real chat, when the goal turned out to be NEET PG, not UG): `src/data/syllabus/neet-pg.js` has the **19 MBBS subjects** (official: NBEMS says the syllabus is the NMC's MBBS curriculum) split into **93 main topics**. The topics and the weightage are our own grouping and a rough guide, since NBEMS publishes neither; double-check against the NEET PG bulletin on natboard.edu.in. When someone just says "NEET", the cat asks "UG or PG?".
+2. **Goals** come from the chat or the **🎯 Set a goal** form:
+   - type (NEET UG, NEET PG, JEE Main, board exams, something else), deadline, hours a day, a lighter weekday, a level per subject, and chapters already done
+   - "something else" and boards: describe it, and paste or photograph the syllabus
+3. **The AI plans only the big picture** (JSON): chapter order, hours per chapter, phases (learn / revise / mock), weekly milestones and a feasibility check.
+   - Syllabus chapters keep their own ids and names (anything the AI invents is dropped, anything it forgets is added at the end).
+   - The **honest numbers are recomputed by code**: hours needed vs. hours available. If the AI says "comfortable" but it doesn't fit, the code overrules it and says so, and the plan puts high-weightage and weak chapters first.
+4. **The app spreads it over the days** (`schedule.js`, no AI):
+   - daily targets in minutes and chapters, one lighter day a week (50%)
+   - a few empty buffer days, then revision and mock-test days
+   - it's worked out again from today every time, so a missed day's chapters simply move forward
+5. **Saved** in `goals` (yours to change) and `roadmaps` (written only by the function). The roadmap view shows:
+   - a countdown ("184 days to NEET UG 2027") and a progress bar
+   - the feasibility note and today's plan
+   - the milestones, with this week highlighted
+   - a chapter checklist: ticking one saves it
+6. **The daily goal ring** in the top bar: "3h 20m / 6h". Starting the timer preselects the next chapter's subject; subjects are created for you from the roadmap. Reaching the target:
+   - **+15 coins** from the server (`claim_daily_goal`, once a day, counted toward the daily cap)
+   - a 👑 on that day in the calendar, and a celebration from the cat
+   - The 25-minute streak rule didn't change.
+7. **Regenerate roadmap** asks first and counts toward the limit. Changing hours or the deadline only re-runs the schedule (no AI).
+- Bonus coins are a new table, `bonus_coins`. `end_session` now counts them toward the daily cap too (file 9 rebuilds it, with only that one line changed), and `daily_totals` includes them.
+
+#### Part 3 — Break quiz (`quiz` function, `src/ai/QuizBubble.jsx`)
+- After a session the card offers **Quiz me** (never forced); the chat can suggest it too. The topic is this session's roadmap chapter or subject, or a few words you type.
+- 3 multiple-choice questions, asked one by one in the cat's speech bubble, with "Yes!" or "Not quite!" and a short explanation after each.
+- **The answers never reach the browser:** they're saved with the quiz (`quizzes`, where users can't read that column), and `answer_quiz` checks each answer on the server.
+- **+5 coins** for finishing (right or wrong), once per quiz, inside the daily cap. A quiz expires after 6 hours.
+
+#### Part 4 — Weekly report (`report` function, `src/ai/WeeklyReport.jsx`)
+- On Mondays it opens by itself (once a week), or tap **📝 Weekly report** in the study calendar.
+- **The numbers come from the database** (`week_stats`): hours, days, best day, subjects, coins, goal days, plus the streak and roadmap progress. The AI only writes a short summary and one tip, and is told never to change a number. The report shows the database's numbers, not the AI's.
+- Each week is written once and kept (`weekly_reports`), so opening it again is free. A week with no study gets a kind note without asking the AI.
+
+#### Tested
+- `npm run test:ai` (new): **125 checks**, in Node with a fake AI and a fake database. It covers:
+  - the Gemini request (key in the header, schema, limits, low thinking), skipping its thinking, and busy models (429 retry, straight to the backup on "high demand" or a time-out, then "tired")
+  - the prompt order (catVoice first, safety last)
+  - distress detection (8 serious messages caught, 5 idioms not)
+  - the login check, limits before any AI call, calls given back on failure
+  - the 14-day stats, onboarding and goal checks, one suggestion per conversation
+  - the crisis reply even with the limit used up or the AI down
+  - roadmap checks (dropped and added chapters, honest feasibility), the schedule (light day, carry-over, buffer, missed days, too much work)
+  - quiz checks (answers never sent), and the report (database numbers, once per week, no AI for an empty week)
+- `npm run test:db`: **163 checks** (the 89 from before, all still passing). It covers:
+  - limits: only the server key may reserve, 30 / 3 / 10 / 1, per user, given back but never below 0
+  - row security on chat, goals, roadmaps, bonus coins, quizzes and reports
+  - the daily goal bonus (not before the target, +15 once, the 👑, the cap)
+  - bonus coins counting toward the session cap, and the server's daily target matching the app's (6 combinations)
+  - the quiz (answers hidden, checked on the server, +5 once, the cap, the 6-hour expiry) and `week_stats`
+- All 4 functions pass `deno check` (Deno is the runtime Supabase uses). The chat function also ran locally in Deno: CORS answered, and requests without a login were refused with 401.
+- **The screens** were tested in a separate headless Chrome where a test script stood in for Supabase (a fake login, database and AI), on desktop (1200×760) and phone (390×844). **62 checks, no console errors.** They covered:
+  - onboarding to the confirmed goal, building the roadmap, ticking a chapter, editing hours without the AI
+  - the crisis card, "the cat is tired", the daily limit, the quiz from start to +5 coins
+  - the weekly report, and the ring turning gold with +15 once
+  - a custom goal with a pasted syllabus, "Change something", and the chat logged out
+  - That testing found and fixed the missing **🎯 Set a goal** button, the phone top bar overflowing, the quiz bubble running off a phone screen, sheets too tall for the room, and squashed text boxes.
+- ⚠️ **Not tested:** real calls to Gemini (the key is yours, and only you set it) and the real deployed functions. Please run the setup above and the checklist below.
+
+#### Your checklist (logged in, after the setup)
+1. 💬 → answer the cat's 4 questions → "Looks right" → "Build my roadmap": a countdown, a plan, today's chapters.
+2. Tick a chapter; change hours a day in **Edit goal** (the plan changes, no AI).
+3. Study until the ring is full: +15 coins, 👑 in the calendar.
+4. After a session: **Quiz me** → 3 questions → +5 coins.
+5. Calendar → **📝 Weekly report**.
+6. Type "I feel hopeless" in the chat: a serious reply and the helplines.
+7. Check your usage in Google AI Studio after a day or two: if the free tier is too tight, lower the limits in `game_settings`.
+
 ---
 
 ## 3. Project structure
@@ -436,11 +574,14 @@ study-cat/
 │  ├─ cat-generator-hd/     the HD pack's Python generator (props.py: room art), previews, READMEs (not deployed)
 │  ├─ make-thumbs.mjs       cuts the wardrobe pictures out of the sheets (npm run thumbs)
 │  ├─ make-meows.mjs        makes public/sounds/*.wav (npm run meows)
-│  └─ db-test.mjs           tests the database migrations in PGlite (npm run test:db)
+│  ├─ db-test.mjs           tests the database migrations in PGlite (npm run test:db)
+│  └─ ai-test.mjs           tests the AI functions' logic with a fake AI (npm run test:ai)
 ├─ scripts/export-lines.mjs writes voice-lines.csv (npm run voice:lines)
 ├─ voice-lines.csv          every cat line with its id, for recording
 ├─ CREDITS.md               where every sound comes from (all CC0)
-├─ supabase/migrations/     the 6 SQL files to paste into Supabase, in order
+├─ supabase/migrations/     the 12 SQL files to paste into Supabase, in order
+├─ supabase/functions/      the AI Edge Functions: chat, roadmap, quiz, report (+ _shared/)
+├─ supabase/config.toml     Supabase CLI settings (the functions need a login)
 ├─ .env.local               your Supabase URL + publishable key (NOT committed)
 ├─ .env.example             the same names with no values (committed)
 └─ src/
@@ -451,6 +592,9 @@ study-cat/
    ├─ audio/catVoice.js     ★ cat babble (Web Audio), recordings, meows, volume
    ├─ lib/supabase.js       the Supabase client, local day, live streak
    ├─ lib/calendar.js       dates for the calendar, the 4 day levels, local streaks
+   ├─ ai/                   the AI screens: chat, goal form, roadmap, ring, quiz, report;
+   │                        client.js (calls + kind errors), schedule.js (days, no AI)
+   ├─ data/syllabus/        NEET UG, NEET PG and JEE Main chapters (double-check the official PDFs)
    ├─ hooks/                useTimer, useStudyStats, useCatVoice, useLocalStorage,
    │                        useAuth, useProfile, useStudySessions, useLeaveTracker,
    │                        useWakeLock, useSubjects, useDailyTotals, useSubjectTotals
@@ -509,7 +653,10 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run preview` | Serves the built `dist/` locally, to check the release version |
 | `npm run lint` | Checks the code for common mistakes (oxlint) |
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
-| `npm run test:db` | Tests the Supabase migrations locally (three pretend users, 89 checks) |
+| `npm run test:db` | Tests the Supabase migrations locally (pretend users, 163 checks) |
+| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (125 checks) |
+| `npx supabase functions deploy --use-api` | Deploys the 4 AI functions (after `npx supabase login` and `link`) |
+| `npx supabase secrets list` | Shows which secrets are set (never their values) |
 | `npm run voice:lines` | Writes every cat line with its id to `voice-lines.csv` |
 | `npm run meows` | Re-makes the meow sounds in `public/sounds/` |
 | `npx vercel env ls` | Lists the environment variables on Vercel |
@@ -624,6 +771,12 @@ Use two browsers (or a normal and a private window), one account each, with 1-mi
 - A web page can't tell "screen switched off" from "switched to another app" (Safari gives no way to know). That's why the button and Book mode exist.
 - The leave count is per server session, and Pause → Start begins a new one, so pausing resets the free trips in Medium.
 - On iPhones, the wake lock needs iOS 16.4 or newer. Older ones just let the screen sleep (use Book mode).
+- **AI (step 21):**
+  - The free tier is shared by everyone, so the daily AI limits are low on purpose. They count by UTC day (in India they reset at 5:30 am).
+  - The AI can be wrong. Quiz answers and roadmap hours come from it (the code checks their shape, not whether a fact is right).
+  - The syllabus files are a snapshot: please double-check them against the official PDFs.
+  - The schedule only knows "done" or "not done" per chapter, not half-done ones.
+  - The weekly report's streak is today's streak, not the one at the end of that week.
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
 - A change of plan waits for the current move to finish (up to about 2 s for a long loop like `read`), on purpose, so the cat never snaps.
 - Phaser adds about 320 kB (gzipped) to download, plus ~0.6–0.8 MB for a breed sheet, ~0.05–0.35 MB for an outfit, and ~70 kB of room art. They load after the page, but the very first visit shows an empty room for a moment, and picking a new breed or outfit takes a moment the first time.

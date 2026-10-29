@@ -10,7 +10,8 @@ const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
 // Tap the 🔥 (or "Today") → a month of study: each day coloured by
 // minutes, streak days joined by a little flame trail, tap a day for more.
-export function StreakCalendar({ ref, open, onClose, userId, local, streak, bestStreak, streakMinutes, version }) {
+// onReport: opens last week's report (logged in only)
+export function StreakCalendar({ ref, open, onClose, userId, local, streak, bestStreak, streakMinutes, version, onReport }) {
   const today = localDay()
   const [month, setMonth] = useState(monthOf(today))
   const [picked, setPicked] = useState(today)
@@ -59,9 +60,16 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
     <section ref={ref} className="sheet calendar" role="dialog" aria-label="Study calendar" hidden={!open}>
       <header className="sheet-head">
         <h2>Study calendar</h2>
-        <button className="icon" onClick={onClose} aria-label="Close" ref={closeButton}>
-          ×
-        </button>
+        <div className="calendar-head-buttons">
+          {onReport && (
+            <button className="calendar-report" onClick={onReport}>
+              📝 Weekly report
+            </button>
+          )}
+          <button className="icon" onClick={onClose} aria-label="Close" ref={closeButton}>
+            ×
+          </button>
+        </div>
       </header>
 
       <dl className="calendar-stats">
@@ -104,6 +112,7 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
             if (!d) return <span key={`blank-${w}-${i}`} className="calendar-blank" />
             const minutes = minutesOf(d)
             const streakDay = isStreakDay(d)
+            const crown = days[d]?.goal_hit // hit the daily goal from your roadmap
             const classes = [
               'calendar-day',
               `level-${levelFor(minutes)}`,
@@ -121,12 +130,17 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
                 disabled={d > today}
                 onClick={() => setPicked(d)}
                 aria-pressed={d === picked}
-                aria-label={`${dayName(d)}: ${minutes} minutes${streakDay ? ', streak day' : ''}`}
+                aria-label={`${dayName(d)}: ${minutes} minutes${streakDay ? ', streak day' : ''}${crown ? ', daily goal reached' : ''}`}
               >
                 <span className="calendar-num">{Number(d.slice(8))}</span>
                 {streakDay && (
                   <span className="calendar-flame" aria-hidden="true">
                     🔥
+                  </span>
+                )}
+                {crown && (
+                  <span className="calendar-crown" aria-hidden="true">
+                    👑
                   </span>
                 )}
               </button>
@@ -155,6 +169,7 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
             <>
               <p className="calendar-detail-stats">
                 <strong>{detail.minutes} min</strong>
+                {detail.goal_hit && <span>👑 daily goal</span>}
                 {detail.sessions !== undefined && (
                   <span>
                     {detail.sessions} {detail.sessions === 1 ? 'session' : 'sessions'}

@@ -1,0 +1,64 @@
+/* ── Weekly report ── */
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  overflow-y: auto;
+}
+.report-numbers {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.report-numbers div {
+  padding: 0.35rem 0.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.report-numbers dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.report-numbers dd {
+  margin: 0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.report-words {
+  margin: 0;
+  font-family: 'Patrick Hand', cursive;
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+.report-tip {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: var(--sage-light);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+}
+.report-thinking {
+  animation: quiz-think 1.2s ease-in-out infinite;
+}
+.report-error {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.report-error p {
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .report-numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@keyframes quiz-think {
+  50% {
+    opacity: 0.5;
+  }
+}

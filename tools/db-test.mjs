@@ -10,6 +10,8 @@ import { PGlite } from '@electric-sql/pglite'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dayTarget } from '../src/ai/schedule.js'
+import { NEET_PG } from '../src/data/syllabus/neet-pg.js'
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations')
 const db = await PGlite.create()
@@ -18,15 +20,16 @@ const db = await PGlite.create()
 await db.exec(`
   create role anon nologin;
   create role authenticated nologin;
+  create role service_role nologin bypassrls; -- the server's own key (Edge Functions)
   create schema auth;
   create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb not null default '{}');
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth, public to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
+  grant usage on schema auth, public to anon, authenticated, service_role;
+  grant execute on function auth.uid() to anon, authenticated, service_role;
   -- Supabase's defaults: new tables and functions are open to everyone
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  alter default privileges in schema public grant execute on functions to anon, authenticated;
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 `)
 for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
   await db.exec(readFileSync(join(dir, file), 'utf8'))
@@ -53,6 +56,17 @@ async function as(uid, sql, params) {
   } finally {
     await db.exec(`reset role`)
     await db.query(`select set_config('request.jwt.claim.sub', '', false)`)
+  }
+}
+// run as the Edge Functions' server key (service_role)
+async function asService(sql, params) {
+  await db.exec(`set role service_role`)
+  try {
+    return { rows: (await db.query(sql, params)).rows, error: null }
+  } catch (error) {
+    return { rows: [], error: error.message }
+  } finally {
+    await db.exec(`reset role`)
   }
 }
 // pretend a session started `minutes` ago (only the test, as admin, can do this)
@@ -314,6 +328,229 @@ check('bad values are ignored, not saved', r.rows[0]?.legacy_minutes === 0 && !r
 const coinsB = (await admin(`select coins, legacy_minutes from public.profiles where id = $1`, [B]))[0]
 const earnedB = (await admin(`select sum(coins_awarded)::int as n from public.study_sessions where user_id = $1`, [B]))[0].n
 check('imported minutes give no coins (coins = only what sessions earned)', coinsB.legacy_minutes === 1234 && coinsB.coins === earnedB, `${coinsB.coins} vs ${earnedB}`)
+
+console.log('\nAI limits (migration 7)')
+r = await as(A, `select public.ai_reserve($1, 'chat')`, [A])
+check("users can't take AI calls themselves", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(A, `select public.ai_release($1, 'chat')`, [A])
+check("users can't give AI calls back (that would be unlimited)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(null, `select public.ai_reserve($1, 'chat')`, [A])
+check("logged-out visitors can't either", r.error?.includes('permission denied'), r.error ?? 'no error')
+const reserve = async (uid, kind) => (await asService(`select public.ai_reserve($1, $2) as r`, [uid, kind])).rows[0]?.r
+const limits = { chat: 30, roadmap: 3, quiz: 10, report: 1 }
+for (const [kind, limit] of Object.entries(limits)) {
+  let last
+  for (let i = 0; i < limit; i++) last = await reserve(A, kind)
+  const over = await reserve(A, kind)
+  check(`${kind}: ${limit} a day, then refused`, last?.allowed === true && last.used === limit && over?.allowed === false && over.limit === limit, JSON.stringify({ last, over }))
+}
+check("one user's limit doesn't touch another's", (await reserve(B, 'report'))?.allowed === true)
+await asService(`select public.ai_release($1, 'quiz')`, [A])
+check('a failed AI call is given back (one more allowed)', (await reserve(A, 'quiz'))?.allowed === true && (await reserve(A, 'quiz'))?.allowed === false)
+for (let i = 0; i < 5; i++) await asService(`select public.ai_release($1, 'report')`, [B])
+check('giving back never goes below 0', (await admin(`select used from public.ai_usage where user_id = $1 and kind = 'report'`, [B]))[0].used === 0)
+r = await asService(`select public.ai_reserve($1, 'poems')`, [A])
+check('an unknown kind is refused', r.error?.includes('Unknown AI kind'), r.error ?? 'no error')
+await admin(`update public.game_settings set ai_chat_daily_limit = 31`)
+check('the limits live in game_settings', (await reserve(A, 'chat'))?.allowed === true && (await reserve(A, 'chat'))?.allowed === false)
+await admin(`update public.game_settings set ai_chat_daily_limit = 30`)
+r = await as(A, `select kind, used from public.ai_usage`)
+check('users see their own AI usage only', r.rows.length === 4 && r.rows.every((x) => x.used > 0), JSON.stringify(r.rows))
+r = await as(A, `update public.ai_usage set used = 0`)
+check("users can't reset their usage", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(A, `insert into public.ai_usage (user_id, day, kind, used) values ($1, '2030-01-01', 'chat', 0)`, [A])
+check("users can't add usage rows", r.error?.includes('permission denied'), r.error ?? 'no error')
+
+console.log('\nChat messages (migration 8)')
+r = await as(A, `insert into public.chat_messages (user_id, role, text) values ($1, 'cat', 'I am the cat')`, [A])
+check("users can't write the cat's lines", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await asService(
+  `insert into public.chat_messages (user_id, role, text, meta) values ($1, 'user', 'hi', '{}'), ($1, 'cat', 'mrrp', '{"suggest":"quiz"}'), ($2, 'user', 'ben here', '{}')`,
+  [A, B],
+)
+check('the chat function saves messages', !r.error, r.error ?? '')
+r = await as(A, `select text from public.chat_messages order by id`)
+check('Ana reads only her chat', r.rows.length === 2 && r.rows[1].text === 'mrrp', JSON.stringify(r.rows))
+r = await as(A, `delete from public.chat_messages returning id`)
+check('Ana can clear her chat', r.rows.length === 2 && (await admin(`select count(*)::int as n from public.chat_messages where user_id = $1`, [A]))[0].n === 0)
+check("clearing doesn't touch Ben's chat", (await admin(`select count(*)::int as n from public.chat_messages where user_id = $1`, [B]))[0].n === 1)
+r = await asService(`insert into public.chat_messages (user_id, role, text) values ($1, 'user', $2)`, [A, 'x'.repeat(8001)])
+check('a message over 8000 characters is refused', r.error !== null)
+
+console.log('\nGoals (migration 8)')
+const goalSql = `insert into public.goals (kind, title, deadline, hours_per_day, subjects) values ($1, $2, $3, $4, $5) returning id, user_id`
+r = await as(A, goalSql, ['neet', 'NEET UG 2027', '2027-05-02', 6, JSON.stringify([{ name: 'Physics', level: 'weak' }])])
+const goalA = r.rows[0]?.id
+check('Ana sets a goal (it is hers automatically)', r.rows[0]?.user_id === A, r.error ?? '')
+r = await as(A, goalSql, ['jee_main', 'JEE', '2027-01-20', 5, '[]'])
+check('only one active goal at a time', r.error?.includes('duplicate') || r.error?.includes('unique'), r.error ?? 'no error')
+r = await as(A, `insert into public.goals (user_id, kind, title, deadline, hours_per_day) values ($1, 'neet', 'x', '2027-05-02', 4)`, [B])
+check("Ana can't make a goal for Ben", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(B, goalSql, ['custom', 'Learn Spanish', '2027-03-01', 0.25, '[]'])
+check('less than half an hour a day is refused', r.error?.includes('check'), r.error ?? 'no error')
+r = await as(B, goalSql, ['custom', 'Learn Spanish', '2027-03-01', 1, '[]'])
+const goalB = r.rows[0]?.id
+r = await as(A, `update public.goals set hours_per_day = 7, done_chapters = '{phy_units}' where id = $1 returning hours_per_day`, [goalA])
+check('Ana can change her goal', Number(r.rows[0]?.hours_per_day) === 7, r.error ?? '')
+r = await as(A, `update public.goals set hours_per_day = 1 where id = $1 returning id`, [goalB])
+check("Ana can't change Ben's goal", r.rows.length === 0)
+r = await as(A, `select id from public.goals`)
+check('Ana sees only her goal', r.rows.length === 1 && r.rows[0].id === goalA)
+r = await as(A, `update public.goals set user_id = $2 where id = $1`, [goalA, B])
+check("a goal can't be moved to someone else", r.error?.includes('permission denied'), r.error ?? 'no error')
+
+console.log('\nRoadmaps (migration 9)')
+r = await as(A, `insert into public.roadmaps (user_id, goal_id, plan) values ($1, $2, '{}') returning id`, [A, goalA])
+check("users can't write roadmaps (only the roadmap function)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await asService(`insert into public.roadmaps (user_id, goal_id, plan) values ($1, $2, $3) returning id`, [A, goalA, JSON.stringify({ chapters: [] })])
+check('the roadmap function saves a roadmap', r.rows.length === 1, r.error ?? '')
+check('Ana reads her roadmap', (await as(A, `select id from public.roadmaps`)).rows.length === 1)
+check("Ben can't read Ana's roadmap", (await as(B, `select id from public.roadmaps`)).rows.length === 0)
+
+console.log('\nDaily goal bonus (+15, once a day, inside the daily cap)')
+const D = '44444444-4444-4444-4444-444444444444'
+await admin(`insert into auth.users (id, email) values ($1, 'dee@example.com')`, [D])
+const claim = async (uid, day = today) => (await as(uid, `select public.claim_daily_goal($1) as r`, [day])).rows[0]?.r
+const coinsOf = async (uid) => (await admin(`select coins from public.profiles where id = $1`, [uid]))[0].coins
+check('no goal → nothing to claim', (await claim(D))?.reason === 'no_goal')
+const dow = (await admin(`select extract(dow from $1::date)::int as d`, [today]))[0].d
+r = await as(D, `insert into public.goals (kind, title, deadline, hours_per_day, light_weekday) values ('custom', 'Spanish', $1, 1, $2) returning id`, [
+  await utcDay(60),
+  (dow + 1) % 7, // the lighter day is tomorrow, so today's target is the full hour
+])
+const goalD = r.rows[0]?.id
+await session(D, 30, 30, today)
+let c = await claim(D)
+check('30 of 60 minutes: not yet', c?.hit === false && c.minutes === 30 && c.target === 60, JSON.stringify(c))
+await session(D, 30, 30, today)
+const beforeBonus = await coinsOf(D)
+c = await claim(D)
+check('60 of 60 minutes: +15 coins', c?.hit === true && c.coins_awarded === 15 && (await coinsOf(D)) === beforeBonus + 15, JSON.stringify(c))
+c = await claim(D)
+check('only once a day', c?.hit === true && c.already === true && c.coins_awarded === 0 && (await coinsOf(D)) === beforeBonus + 15)
+r = await as(D, `select kind, coins from public.bonus_coins`)
+check('Dee sees her bonus', r.rows.length === 1 && r.rows[0].coins === 15)
+check("Ana doesn't see Dee's bonus", (await as(A, `select id from public.bonus_coins`)).rows.length === 0)
+r = await as(D, `insert into public.bonus_coins (user_id, day, kind, coins) values ($1, $2, 'quiz', 500)`, [D, today])
+check("users can't give themselves bonus coins", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(D, `select * from public.daily_totals($1, $1)`, [today])
+check('daily_totals: the 👑 and the bonus in the day\'s coins', r.rows[0]?.goal_hit === true && r.rows[0].coins === beforeBonus + 15, JSON.stringify(r.rows))
+r = await as(A, `select * from public.daily_totals($1, $1)`, [today])
+check('no crown on a day without the bonus', r.rows[0]?.goal_hit === false, JSON.stringify(r.rows))
+
+// bonus coins count toward the daily cap, for sessions too
+const dayCoins = beforeBonus + 15
+await admin(`update public.game_settings set daily_coin_cap = $1`, [dayCoins + 5])
+const capped = await session(D, 20, 20, today)
+check('bonus coins count toward the daily cap (a 20-minute session gets only 5)', capped.coins_awarded === 5 && capped.capped === true, JSON.stringify(capped))
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+
+const E = '55555555-5555-5555-5555-555555555555'
+await admin(`insert into auth.users (id, email) values ($1, 'eve@example.com')`, [E])
+await as(E, `insert into public.goals (kind, title, deadline, hours_per_day, light_weekday) values ('custom', 'x', $1, 0.5, $2)`, [await utcDay(30), (dow + 1) % 7])
+await admin(`update public.game_settings set daily_coin_cap = 34`) // a 25-minute session earns 25 + 10
+await session(E, 25, 25, today)
+await session(E, 5, 5, today)
+c = await claim(E)
+check('the bonus itself stops at the daily cap', c?.hit === true && c.coins_awarded === 0 && c.capped === true, JSON.stringify(c))
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+r = await as(E, `select * from public.daily_totals($1, $1)`, [today])
+check('…but the day still gets its crown', r.rows[0]?.goal_hit === true)
+
+// the server's daily target is the same as the app's (src/ai/schedule.js)
+const targets = []
+for (const [hours, light] of [[6, dow], [6, (dow + 3) % 7], [0.5, dow], [2.5, dow], [7.25, (dow + 1) % 7], [16, dow]]) {
+  await admin(`update public.goals set hours_per_day = $2, light_weekday = $3 where id = $1`, [goalD, hours, light])
+  const sql = (await admin(`select public._goal_target(g, $2::date) as t from public.goals g where g.id = $1`, [goalD, today]))[0].t
+  const js = dayTarget({ hours_per_day: hours, light_weekday: light }, today, { goal_light_day_pct: 50, streak_min_minutes: 25 })
+  targets.push(`${hours}h:${sql}/${js}`)
+  if (sql !== js) check(`target for ${hours} h (light day ${light === dow})`, false, `SQL ${sql}, app ${js}`)
+}
+check('the daily target is the same in SQL and in the app (incl. the lighter day)', targets.every((t) => t.split(':')[1].split('/')[0] === t.split('/')[1]), targets.join(' '))
+
+await admin(`update public.goals set deadline = $2 where id = $1`, [goalD, await utcDay(-1)])
+check('no bonus after the deadline', (await claim(D))?.reason === 'after_deadline')
+r = await as(D, `select public._day_coins($1, $2)`, [D, today])
+check("users can't call the helper functions", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(null, `select public.claim_daily_goal($1)`, [today])
+check("logged-out visitors can't claim", r.error?.includes('permission denied'), r.error ?? 'no error')
+
+console.log('\nBreak quiz (migration 10)')
+const questions = JSON.stringify([
+  { q: 'One?', options: ['a', 'b', 'c', 'd'], answer: 1, explain: 'b is one' },
+  { q: 'Two?', options: ['a', 'b', 'c', 'd'], answer: 2, explain: 'c is two' },
+  { q: 'Three?', options: ['a', 'b', 'c'], answer: 0, explain: 'a is three' },
+])
+r = await as(D, `insert into public.quizzes (user_id, topic, questions) values ($1, 'x', $2)`, [D, questions])
+check("users can't write quizzes (only the quiz function)", r.error?.includes('permission denied'), r.error ?? 'no error')
+const makeQuiz = async (uid) => (await asService(`insert into public.quizzes (user_id, topic, questions) values ($1, 'Optics', $2) returning id`, [uid, questions])).rows[0].id
+const quizD = await makeQuiz(D)
+r = await as(D, `select questions from public.quizzes`)
+check("users can't read a quiz's questions (they hold the answers)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(D, `select id, topic from public.quizzes`)
+check('…but they can see their quizzes', r.rows.length === 1 && r.rows[0].topic === 'Optics')
+const answer = async (uid, id, choice) => as(uid, `select public.answer_quiz($1, $2, $3) as r`, [id, choice, today])
+r = await answer(A, quizD, 1)
+check("Ana can't answer Dee's quiz", r.error?.includes('not found'), r.error ?? 'no error')
+r = await answer(D, quizD, 9)
+check('an answer that is not one of the options is refused', r.error?.includes('No such answer'), r.error ?? 'no error')
+const coinsBeforeQuiz = await coinsOf(D)
+let a1 = (await answer(D, quizD, 1)).rows[0]?.r
+check('a right answer: correct, with the explanation', a1?.correct === true && a1.explain === 'b is one' && !a1.finished && a1.coins_awarded === 0, JSON.stringify(a1))
+a1 = (await answer(D, quizD, 0)).rows[0]?.r
+check('a wrong answer: shows the right one', a1?.correct === false && a1.answer === 2 && a1.score === 1, JSON.stringify(a1))
+check('no coins before the quiz is finished', (await coinsOf(D)) === coinsBeforeQuiz)
+await admin(`update public.game_settings set daily_coin_cap = 99999`)
+a1 = (await answer(D, quizD, 0)).rows[0]?.r
+check('finishing gives +5 coins (right or wrong)', a1?.finished === true && a1.coins_awarded === 5 && a1.score === 2 && (await coinsOf(D)) === coinsBeforeQuiz + 5, JSON.stringify(a1))
+r = await answer(D, quizD, 0)
+check('a finished quiz takes no more answers (no coins twice)', r.error?.includes('already finished') && (await coinsOf(D)) === coinsBeforeQuiz + 5, r.error ?? 'no error')
+check('the bonus is recorded once', (await admin(`select count(*)::int as n from public.bonus_coins where ref = $1`, [quizD]))[0].n === 1)
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+// the quiz bonus counts toward the daily cap
+const quizE = await makeQuiz(E)
+await admin(`update public.game_settings set daily_coin_cap = (select public._day_coins($1, $2::date)) + 2`, [E, today])
+for (const choice of [1, 2]) await answer(E, quizE, choice)
+a1 = (await answer(E, quizE, 0)).rows[0]?.r
+check('the quiz bonus stops at the daily cap (only 2 left)', a1?.coins_awarded === 2 && a1.capped === true, JSON.stringify(a1))
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+const old = await makeQuiz(D)
+await admin(`update public.quizzes set created_at = now() - interval '7 hours' where id = $1`, [old])
+r = await answer(D, old, 1)
+check('a quiz older than 6 hours expires', r.error?.includes('expired'), r.error ?? 'no error')
+r = await as(null, `select public.answer_quiz($1, 0, $2)`, [quizD, today])
+check("logged-out visitors can't answer", r.error?.includes('permission denied'), r.error ?? 'no error')
+
+console.log('\nWeekly report (migration 11)')
+const monday = (await admin(`select date_trunc('week', $1::date)::date::text as d`, [today]))[0].d
+const week = async (uid, start = monday) => as(uid, `select public.week_stats($1) as w`, [start])
+r = await week(D)
+const w = r.rows[0]?.w
+const realD = (await admin(`select coalesce(sum(counted_minutes), 0)::int as m, count(*)::int as n from public.study_sessions where user_id = $1 and ended_at is not null and counted_minutes > 0 and study_day between $2::date and $2::date + 6`, [D, monday]))[0]
+check("week_stats: the week's minutes and sessions", w?.minutes === realD.m && w.sessions === realD.n && w.minutes > 0, JSON.stringify({ w, realD }))
+check('week_stats: days, best day, subjects, coins incl. bonuses, goal days', w?.days_studied === 1 && w.best_day?.minutes === realD.m && Array.isArray(w.subjects) && w.goal_days === 1 && w.coins >= 15, JSON.stringify(w))
+r = await week(B)
+const realB = (await admin(`select count(*)::int as n from public.study_sessions where user_id = $1 and ended_at is not null and counted_minutes > 0 and study_day between $2::date and $2::date + 6`, [B, monday]))[0].n
+check('week_stats only counts your own sessions', r.rows[0]?.w.sessions === realB, JSON.stringify(r.rows[0]?.w))
+r = await week(D, (await admin(`select ($1::date + 1)::text as d`, [monday]))[0].d) // a Tuesday
+check('a week must start on a Monday', r.error?.includes('Monday'), r.error ?? 'no error')
+r = await as(null, `select public.week_stats($1)`, [monday])
+check("logged-out visitors can't call week_stats", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(D, `insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, '{}', 'x', 'y')`, [D, monday])
+check("users can't write their own report (only the report function)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await asService(`insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, $3, 'A good week!', 'Keep going.') returning id`, [D, monday, JSON.stringify(w)])
+check('the report function saves a report', r.rows.length === 1, r.error ?? '')
+r = await asService(`insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, '{}', 'again', 'again')`, [D, monday])
+check('one report per week', r.error?.includes('duplicate') || r.error?.includes('unique'), r.error ?? 'no error')
+check('Dee reads her report, Ana does not', (await as(D, `select summary from public.weekly_reports`)).rows.length === 1 && (await as(A, `select summary from public.weekly_reports`)).rows.length === 0)
+
+console.log('\nNEET PG goals (migration 12)')
+const F = '66666666-6666-6666-6666-666666666666'
+await admin(`insert into auth.users (id, email) values ($1, 'fay@example.com')`, [F])
+r = await as(F, `insert into public.goals (kind, title, deadline, hours_per_day, chapters) values ('neet_pg', 'NEET PG 2027', '2027-08-15', 8, $1) returning kind, jsonb_array_length(chapters) as n`, [JSON.stringify(NEET_PG.chapters)])
+check('a NEET PG goal with all its topics can be saved', r.rows[0]?.kind === 'neet_pg' && r.rows[0].n === NEET_PG.chapters.length, r.error ?? '')
+r = await as(F, `update public.goals set kind = 'mbbs' where user_id = $1`, [F])
+check('goal types are still a fixed list', r.error !== null)
 
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {

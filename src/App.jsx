@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AccountPanel } from './components/AccountPanel'
+import { ChatPanel } from './ai/ChatPanel'
+import { GoalForm } from './ai/GoalForm'
+import { GoalRing } from './ai/GoalRing'
+import { QuizBubble } from './ai/QuizBubble'
+import { RoadmapPanel } from './ai/RoadmapPanel'
+import { useQuiz } from './ai/useQuiz'
+import { WeeklyReport } from './ai/WeeklyReport'
+import { lastWeekStart, useWeeklyReport } from './ai/useWeeklyReport'
+import { buildSchedule, dayTarget } from './ai/schedule'
+import { useChat } from './ai/useChat'
+import { useGoal } from './ai/useGoal'
 import { BreakPanel } from './components/BreakPanel'
 import { CoinIcon } from './components/CoinIcon'
 import { CoinPop } from './components/CoinPop'
@@ -23,7 +34,7 @@ import { useProfile } from './hooks/useProfile'
 import { useStudySessions } from './hooks/useStudySessions'
 import { useStudyStats } from './hooks/useStudyStats'
 import { useSubjectTotals } from './hooks/useSubjectTotals'
-import { useSubjects } from './hooks/useSubjects'
+import { SUBJECT_COLORS, useSubjects } from './hooks/useSubjects'
 import { useWakeLock } from './hooks/useWakeLock'
 import { formatTime, useTimer } from './hooks/useTimer'
 import './App.css'
@@ -60,6 +71,9 @@ export default function App() {
   const auth = useAuth()
   const { profile, settings: gameRules, update: updateProfile, merge: mergeProfile } = useProfile(auth.user)
   const streak = liveStreak(profile)
+
+  // ── Your study goal (from the chat or the goal form) ──
+  const goalApi = useGoal(profile?.id ?? null)
 
   // ── Study mode: easy | medium | toxic (on your profile when logged in) ──
   const [localMode, setLocalMode] = useLocalStorage('studycat:mode', 'easy')
@@ -231,12 +245,18 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar' | 'chat' | 'goal' | 'roadmap' | 'report'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
   const prefsRef = useRef(null)
   const subjectRef = useRef(null)
   const calendarRef = useRef(null)
+  const chatRef = useRef(null)
+  const chatButton = useRef(null)
+  const goalRef = useRef(null)
+  const roadmapRef = useRef(null)
+  const ringButton = useRef(null)
+  const reportRef = useRef(null)
   const calendarOpener = useRef(null) // the 🔥 or the Today pill, whichever opened it
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
@@ -248,10 +268,10 @@ export default function App() {
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
     const from =
-      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener }[openSheet.current] ?? myCatButton
+      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener, chat: chatButton, roadmap: ringButton, goal: ringButton, report: calendarOpener }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
-  }, [])
+  }, [setSheet])
   const toggleSheet = (name) => setSheet((open) => (open === name ? null : name))
   const openCalendar = (e) => {
     calendarOpener.current = e.currentTarget
@@ -259,7 +279,45 @@ export default function App() {
   }
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef, chatRef, goalRef, roadmapRef, reportRef], [])
+
+  // ── Chat with the cat (the AI, logged in only) ──
+  const chat = useChat({ userId: profile?.id ?? null, open: sheet === 'chat' })
+  const situation = focusing ? 'studying' : timer.phase === 'break' ? (summary ? 'after_session' : 'break') : 'idle'
+  const onChatAction = async (action, payload) => {
+    if (action === 'login') return setSheet('account')
+    if (action === 'confirm-goal') return goalApi.saveGoal(payload)
+    if (action === 'edit-goal') return openGoalForm(payload)
+    if (action === 'goal') return openGoalForm(null)
+    if (action === 'quiz') {
+      setSheet(null)
+      return offerQuiz()
+    }
+    if (action === 'roadmap') {
+      if (!goalApi.goal) return openGoalForm(null)
+      setSheet('roadmap')
+      if (!goalApi.roadmap && !goalApi.building) goalApi.buildRoadmap()
+    }
+  }
+
+  // ── Goal form and roadmap ──
+  const [goalFormStart, setGoalFormStart] = useState(null) // the goal to edit, or one from the chat
+  const openGoalForm = (start) => {
+    setGoalFormStart(start)
+    setSheet('goal')
+  }
+  const saveGoalForm = async (fields, { build, syllabusText, image }) => {
+    const current = goalApi.goal
+    let goal
+    if (goalFormStart?.id && current?.id === goalFormStart.id && fields.kind === current.kind) {
+      // same goal, new hours / deadline / levels: only the schedule re-runs
+      const { kind: _kind, ...changes } = fields
+      await goalApi.updateGoal(changes)
+      goal = { ...current, ...changes }
+    } else goal = await goalApi.saveGoal(fields)
+    setSheet('roadmap')
+    if (build) goalApi.buildRoadmap({ syllabusText, image }, goal)
+  }
 
   // ── Study sessions on the server → coins + streak ──
   const [coinPop, setCoinPop] = useState(null)
@@ -294,6 +352,97 @@ export default function App() {
       clearTimeout(unbump)
     }
   }, [coinPop])
+  // ── Today's goal (the ring) and the +15 coins when it's reached ──
+  const studyGoal = goalApi.goal
+  const studyPlan = goalApi.roadmap?.plan
+  const goalTarget = profile && studyGoal && today < studyGoal.deadline ? dayTarget(studyGoal, today, gameRules) : null
+  // (cheap: one pass over the days left; the React compiler memoizes it)
+  const schedule = studyGoal ? buildSchedule({ goal: studyGoal, plan: studyPlan, today, rules: gameRules }) : null
+  const claimedDay = useRef(null)
+  const claimDailyGoal = goalApi.claimDailyGoal
+  useEffect(() => {
+    if (!goalTarget || !serverToday.ready || todayMinutes < goalTarget || claimedDay.current === today) return
+    claimedDay.current = today
+    claimDailyGoal().then((r) => {
+      if (!r?.hit || r.already) return
+      mergeProfile({ coins: r.coins })
+      setStatsVersion((v) => v + 1) // the 👑 in the calendar
+      if (r.coins_awarded > 0) {
+        setCoinPop({ id: Date.now(), coins: r.coins_awarded })
+        setCoinBump(true)
+      }
+      game.current?.celebrate()
+      latest.current.say(pickLine('goal.done'))
+    })
+  }, [goalTarget, serverToday.ready, todayMinutes, today, claimDailyGoal, mergeProfile])
+
+  // Starting the timer picks the subject of the next chapter on the roadmap
+  // (the subject is made for you the first time).
+  const nextChapter = schedule?.today?.chapters[0] ?? schedule?.next ?? null
+  const subjectFor = (name) => subjectsApi.subjects.find((s) => s.name.toLowerCase() === name?.toLowerCase())
+  const roadmapSubjects = useMemo(() => [...new Set((studyPlan?.chapters ?? []).map((c) => c.subject))], [studyPlan])
+  const addingSubjects = useRef(false)
+  const subjectList = subjectsApi.subjects
+  const addSubject = subjectsApi.add
+  useEffect(() => {
+    if (!profile || addingSubjects.current) return
+    const missing = roadmapSubjects.filter((name) => !subjectList.some((s) => s.name.toLowerCase() === name.toLowerCase()))
+    if (!missing.length) return
+    addingSubjects.current = true
+    ;(async () => {
+      for (const [i, name] of missing.entries()) await addSubject(name, SUBJECT_COLORS[(subjectList.length + i) % SUBJECT_COLORS.length]).catch(() => {})
+      addingSubjects.current = false
+    })()
+  }, [profile, roadmapSubjects, subjectList, addSubject])
+
+  // ── The break quiz: offered after a session, never forced ──
+  const quizApi = useQuiz({
+    onFinish: (r) => {
+      mergeProfile({ coins: r.coins })
+      setStatsVersion((v) => v + 1)
+      if (r.coins_awarded > 0) {
+        setCoinPop({ id: Date.now(), coins: r.coins_awarded })
+        setCoinBump(true)
+      }
+      game.current?.celebrate()
+      latest.current.say(pickLine('quiz.done'))
+    },
+  })
+  // the topic: this session's roadmap chapter, else its subject
+  const offerQuiz = () => {
+    const chapters = goalApi.roadmap?.plan?.chapters ?? []
+    const done = new Set(goalApi.goal?.done_chapters ?? [])
+    const chapter = subject ? chapters.find((c) => !done.has(c.id) && c.subject.toLowerCase() === subject.name.toLowerCase()) : nextChapter
+    setSummary(null)
+    quizApi.offer(chapter?.name ?? subject?.name ?? '', chapter?.subject ?? subject?.name ?? null)
+  }
+
+  // ── Weekly report: on Mondays it opens by itself (once per week) ──
+  const reportApi = useWeeklyReport()
+  const loadReport = reportApi.load
+  const reportTried = useRef(false)
+  useEffect(() => {
+    if (!profile || reportTried.current || new Date().getDay() !== 1) return
+    reportTried.current = true
+    const week = lastWeekStart()
+    let seen = null
+    try {
+      seen = localStorage.getItem('studycat:reportSeen')
+    } catch {
+      // no storage: it may show again next time, that's fine
+    }
+    if (seen === week) return
+    loadReport().then((report) => {
+      if (!report) return
+      try {
+        localStorage.setItem('studycat:reportSeen', week)
+      } catch {
+        // see above
+      }
+      if (report.stats.minutes > 0 && !openSheet.current) setSheet('report')
+    })
+  }, [profile, loadReport])
+
   const timerGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (away ?? 'study') : 'break'
   const catGoal = wardrobeOpen ? 'showOff' : timerGoal
   const mood = focusing ? 'focus' : timer.phase === 'break' ? 'break' : 'idle'
@@ -374,11 +523,35 @@ export default function App() {
         coverRefs={coverRefs}
         onBusy={setCatBusy}
         onMeow={() => voice.say(pickLine('meow'), { meow: true })}
+        // tapping the cat (logged in, not while studying) opens the chat, after its meow
+        onCatTap={() => profile && !focusing && !openSheet.current && setTimeout(() => setSheet('chat'), 700)}
       />
 
       <header className={`topbar${profile ? ' signed-in' : ''}`}>
         <h1>Study Cat</h1>
         <div className="topbar-right">
+          {goalTarget !== null && (
+            <GoalRing
+              ref={ringButton}
+              minutes={todayMinutes}
+              target={goalTarget}
+              expanded={sheet === 'roadmap'}
+              onClick={() => toggleSheet('roadmap')}
+            />
+          )}
+          {profile && goalApi.loaded && !studyGoal && (
+            <button
+              ref={ringButton}
+              className="set-goal"
+              onClick={() => openGoalForm(null)}
+              aria-expanded={sheet === 'goal'}
+              aria-label="Set a goal"
+              title="Set a goal"
+            >
+              <span aria-hidden="true">🎯</span>
+              <span className="set-goal-label"> Set a goal</span>
+            </button>
+          )}
           {profile && (
             <>
               <span className={`stat coins${coinBump ? ' bump' : ''}`} title="Coins" aria-label={`${profile.coins} coins`}>
@@ -395,6 +568,16 @@ export default function App() {
               </button>
             </>
           )}
+          <button
+            ref={chatButton}
+            className="icon chat-button"
+            onClick={() => toggleSheet('chat')}
+            aria-expanded={sheet === 'chat'}
+            aria-label="Chat with the cat"
+            title="Chat with the cat"
+          >
+            💬
+          </button>
           <button
             ref={myCatButton}
             className="mycat"
@@ -451,7 +634,7 @@ export default function App() {
         </div>
       </header>
 
-      {bubble && (
+      {bubble && !quizApi.quiz && (
         // the whole line is laid out at once (so the bubble doesn't grow
         // while typing); the not-yet-typed part is just invisible
         <div className="bubble" key={bubble.turn ?? bubble.id} role="status">
@@ -464,7 +647,8 @@ export default function App() {
       )}
 
       <CoinPop pop={coinPop} />
-      <SessionSummary summary={summary} onClose={() => setSummary(null)} />
+      <SessionSummary summary={summary} onClose={() => setSummary(null)} onQuiz={profile && !focusing ? offerQuiz : undefined} />
+      <QuizBubble api={quizApi} />
       <ForgiveCard
         card={focusing ? forgiveCard : null}
         onForgive={forgiveLeave}
@@ -484,13 +668,16 @@ export default function App() {
         bestStreak={shownBest}
         streakMinutes={streakMinutes}
         version={statsVersion}
+        onReport={profile ? () => setSheet('report') : undefined}
       />
+      <WeeklyReport ref={reportRef} open={sheet === 'report'} onClose={closeSheet} api={reportApi} />
       <SubjectPicker
         ref={subjectRef}
         open={sheet === 'subject'}
         onClose={closeSheet}
         subjects={subjectsApi.subjects}
-        preselected={subjectsApi.preselected}
+        preselected={(nextChapter && subjectFor(nextChapter.subject)?.id) ?? subjectsApi.preselected}
+        hint={nextChapter && `Next on your roadmap: ${nextChapter.name} (${nextChapter.subject})`}
         onAdd={subjectsApi.add}
         onStart={startWith}
       />
@@ -503,6 +690,26 @@ export default function App() {
         mode={studyMode}
         onModeChange={setStudyMode}
         modeLocked={focusing}
+      />
+      <ChatPanel
+        ref={chatRef}
+        open={sheet === 'chat'}
+        onClose={closeSheet}
+        loggedIn={!!profile}
+        chat={chat}
+        goal={goalApi.goal}
+        situation={situation}
+        onAction={onChatAction}
+      />
+      <GoalForm ref={goalRef} open={sheet === 'goal'} onClose={closeSheet} start={goalFormStart} onSave={saveGoalForm} />
+      <RoadmapPanel
+        ref={roadmapRef}
+        open={sheet === 'roadmap'}
+        onClose={closeSheet}
+        goalApi={goalApi}
+        rules={gameRules}
+        today={today}
+        onEditGoal={() => openGoalForm(goalApi.goal)}
       />
       <Wardrobe ref={wardrobeRef} open={wardrobeOpen} onClose={closeSheet} look={catLook} onChange={setCatLook} />
       {auth.enabled && (

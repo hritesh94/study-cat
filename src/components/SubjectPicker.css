@@ -83,3 +83,10 @@ button.subject-start {
   padding-left: 1.6rem;
   padding-right: 1.6rem;
 }
+
+/* "Next on your roadmap: …" */
+.subject-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}

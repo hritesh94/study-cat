@@ -14,7 +14,7 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 //
 // Phaser is big, so it's loaded only when this component mounts
 // (`import()` makes Vite put it in its own file).
-export function GameCanvas({ ref, goal, mood, look, progress, onLookChange, coverRefs, onBusy, onMeow }) {
+export function GameCanvas({ ref, goal, mood, look, progress, onLookChange, coverRefs, onBusy, onMeow, onCatTap }) {
   const hostRef = useRef(null)
   const sceneRef = useRef(null)
   const bridge = useRef({})
@@ -24,7 +24,7 @@ export function GameCanvas({ ref, goal, mood, look, progress, onLookChange, cove
   // keep callbacks fresh without restarting the game
   useEffect(() => {
     latest.current = { goal, mood, look, progress }
-    Object.assign(bridge.current, { onBusy, onMeow })
+    Object.assign(bridge.current, { onBusy, onMeow, onCatTap })
   })
 
   // the debug panel listens to the brain's state through this
