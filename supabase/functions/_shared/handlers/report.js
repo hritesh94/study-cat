@@ -76,6 +76,7 @@ export async function report(body, { store, ai, now }) {
       messages: [{ role: 'user', text: 'Please write my weekly report.' }],
       schema: REPORT_SCHEMA,
       maxTokens: OUTPUT.report.maxTokens,
+      timeoutMs: OUTPUT.report.timeoutMs,
       temperature: 0.7,
     })
     const summary = clip(out?.summary, OUTPUT.report.maxChars)

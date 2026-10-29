@@ -4,7 +4,7 @@
 // The real functions run on Supabase (Deno); everything they do apart from
 // creating clients lives in supabase/functions/_shared/ as plain JavaScript,
 // so it can be tested here.
-import { AI } from '../supabase/functions/_shared/config.js'
+import { AI, OUTPUT } from '../supabase/functions/_shared/config.js'
 import { catVoice } from '../supabase/functions/_shared/catVoice.js'
 import { AiError } from '../supabase/functions/_shared/errors.js'
 import { makeHandler, withAllowance } from '../supabase/functions/_shared/http.js'
@@ -101,9 +101,11 @@ console.log('\nProvider: Gemini')
       apiKey: 'k',
       models: ['main-model', 'backup-model'],
       wait: async (ms) => waits.push(ms),
-      fetchImpl: async (url) => {
+      fetchImpl: async (url, init) => {
         const status = statuses[seen.length] ?? statuses.at(-1)
         seen.push(`${url.match(/models\/([^:]+)/)[1]}:${status}`)
+        if (!(init.signal instanceof AbortSignal)) throw new Error('no time limit on the request')
+        if (status === 'slow') throw new DOMException('The operation timed out.', 'TimeoutError')
         return status === 200 ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] })) : new Response('busy', { status })
       },
     })
@@ -112,16 +114,22 @@ console.log('\nProvider: Gemini')
   let f = scripted(429, 200)
   let answer = await f.ask()
   check('a 429 is retried once after a short wait (same model)', answer.text === 'ok' && f.seen.join() === 'main-model:429,main-model:200' && f.waits[0] === AI.retryAfterMs, f.seen.join())
-  f = scripted(503, 503, 200)
+  f = scripted(503, 200)
   answer = await f.ask()
-  check('"high demand" (503) twice → the backup model answers', answer.text === 'ok' && answer.model === 'backup-model' && f.seen.join() === 'main-model:503,main-model:503,backup-model:200', f.seen.join())
+  check('"high demand" (503) → straight to the backup model, no waiting', answer.text === 'ok' && answer.model === 'backup-model' && f.seen.join() === 'main-model:503,backup-model:200' && f.waits.length === 0, f.seen.join())
+  f = scripted('slow', 200)
+  answer = await f.ask()
+  check('a model that takes too long counts as busy → the backup answers', answer.model === 'backup-model' && f.seen.join() === 'main-model:slow,backup-model:200', f.seen.join())
   f = scripted(503)
-  check('every model busy → "the cat is tired" (not "napping")', (await throwsCode(f.ask, 'tired')) === true && f.seen.length === 4, f.seen.join())
+  check('every model busy → "the cat is tired" (not "napping")', (await throwsCode(f.ask, 'tired')) === true && f.seen.length === 2, f.seen.join())
+  f = scripted('slow')
+  check('every model too slow → "tired" too', (await throwsCode(f.ask, 'tired')) === true && f.seen.length === 2, f.seen.join())
   f = scripted(503, 429, 404)
   check('main busy and the backup unusable → still "tired"', (await throwsCode(f.ask, 'tired')) === true && f.seen.length === 3, f.seen.join())
   f = scripted(400)
   check('a real error from the main model → ai_down, no backup tried', (await throwsCode(f.ask, 'ai_down')) === true && f.seen.length === 1, f.seen.join())
-  check('the backup model is in config.js', getProvider((k) => ({ GEMINI_API_KEY: 'k' })[k]).model === AI.models.gemini && AI.fallbackModels.gemini === 'gemini-3.6-flash')
+  check('the main and backup models are in config.js', getProvider((k) => ({ GEMINI_API_KEY: 'k' })[k]).model === 'gemini-3.6-flash' && AI.fallbackModels.gemini === 'gemini-3.8-flash')
+  check('every feature has a time limit, chat the shortest', Object.values(OUTPUT).every((o) => o.timeoutMs > 0) && OUTPUT.chat.timeoutMs <= 15000)
   const offline = geminiProvider({ apiKey: 'k', models: ['m'], fetchImpl: async () => { throw new TypeError('fetch failed') } })
   check('no connection to Gemini → ai_down', (await throwsCode(() => offline.generate({ system: 's', messages: [], maxTokens: 1 }), 'ai_down')) === true)
   const blocked = geminiProvider({ apiKey: 'k', models: ['m'], fetchImpl: async () => new Response(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } })) })

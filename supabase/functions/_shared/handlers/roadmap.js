@@ -198,6 +198,7 @@ export async function roadmap(body, { store, ai, now }) {
       messages: [{ role: 'user', text: parts.join('\n\n'), images: photo ? [photo] : [] }],
       schema: ROADMAP_SCHEMA,
       maxTokens: OUTPUT.roadmap.maxTokens,
+      timeoutMs: OUTPUT.roadmap.timeoutMs,
       temperature: 0.4,
     })
     const plan = validPlan(out, goal, { available, weeks: Math.ceil(days / 7) })

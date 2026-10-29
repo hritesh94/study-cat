@@ -207,3 +207,9 @@
     animation: none;
   }
 }
+
+/* a slow answer: say why */
+.chat-slow {
+  color: var(--muted);
+  font-size: 0.8rem;
+}

@@ -73,6 +73,16 @@ export function ChatPanel({ ref, open, onClose, loggedIn, chat, goal, situation,
   const [savedGoals, setSavedGoals] = useState(() => new Set()) // message ids whose goal was saved
   const input = useRef(null)
   const list = useRef(null)
+  const [slow, setSlow] = useState(false) // the answer is taking a while (Google is busy)
+
+  useEffect(() => {
+    if (!chat.sending) return
+    const later = setTimeout(() => setSlow(true), 7000)
+    return () => {
+      clearTimeout(later)
+      setSlow(false)
+    }
+  }, [chat.sending])
 
   useEffect(() => {
     if (!open) return
@@ -177,6 +187,7 @@ export function ChatPanel({ ref, open, onClose, loggedIn, chat, goal, situation,
                   <span>•</span>
                   <span>•</span>
                 </p>
+                {slow && <small className="chat-slow">Still thinking… Google is busy right now, so this can take a bit.</small>}
               </li>
             )}
           </ol>

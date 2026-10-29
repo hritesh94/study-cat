@@ -154,6 +154,7 @@ export async function chat(body, { store, ai, now }) {
       messages,
       schema: CHAT_SCHEMA,
       maxTokens: OUTPUT.chat.maxTokens,
+      timeoutMs: OUTPUT.chat.timeoutMs,
       temperature: distress ? 0.4 : 0.9,
     })
     const reply = clip(out.reply, OUTPUT.chat.maxChars)

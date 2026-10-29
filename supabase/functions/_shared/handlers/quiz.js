@@ -72,6 +72,7 @@ export async function quiz(body, { store, ai }) {
       messages: [{ role: 'user', text: `Quiz me on: ${topic}` }],
       schema: QUIZ_SCHEMA,
       maxTokens: OUTPUT.quiz.maxTokens,
+      timeoutMs: OUTPUT.quiz.timeoutMs,
       temperature: 0.5,
     })
     const questions = validQuestions(out)

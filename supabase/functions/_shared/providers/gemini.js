@@ -8,8 +8,10 @@ const BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // "Too busy" from Google: 429 (the free tier's rate limit) or 503 ("this
-// model is currently experiencing high demand").
+// model is currently experiencing high demand"). A model that takes longer
+// than timeoutMs counts as busy too.
 const BUSY = new Set([429, 503])
+const TIMED_OUT = 'timeout'
 
 // models: the main model first, then the fallback (see config.js)
 // messages: [{ role: 'user' | 'model', text, images?: [{ mimeType, data (base64) }] }]
@@ -18,7 +20,7 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
   return {
     name: 'gemini',
     model: models[0],
-    async generate({ system, messages, schema, maxTokens, temperature = 0.8 }) {
+    async generate({ system, messages, schema, maxTokens, temperature = 0.8, timeoutMs = 30000 }) {
       const body = JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: messages.map((m) => ({
@@ -33,9 +35,10 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
         },
       })
 
-      // Each model gets two tries (with a short wait between) when it's busy.
-      // If it's still busy, the next model gets its turn. Only when they're
-      // all busy does the cat say it's tired.
+      // Busy or too slow? Go straight to the next model. Only a 429 (the
+      // rate limit, which passes quickly) is first tried once more on the
+      // same model, after a short wait. When every model is busy, the cat
+      // says it's tired.
       for (const [m, model] of models.entries()) {
         for (let attempt = 0; attempt < 2; attempt++) {
           let res
@@ -44,13 +47,19 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
               body,
+              signal: AbortSignal.timeout(timeoutMs),
             })
           } catch (error) {
-            throw new AiError('ai_down', `Gemini unreachable: ${error.message}`)
+            if (error?.name === 'TimeoutError' || error?.name === 'AbortError') res = { status: TIMED_OUT }
+            else throw new AiError('ai_down', `Gemini unreachable: ${error.message}`)
           }
-          if (BUSY.has(res.status)) {
-            if (attempt === 0) await wait(AI.retryAfterMs)
+          if (res.status === 429 && attempt === 0) {
+            await wait(AI.retryAfterMs)
             continue
+          }
+          if (BUSY.has(res.status) || res.status === TIMED_OUT) {
+            console.warn(`[ai] ${model} is busy (${res.status}), ${m + 1 < models.length ? 'trying the backup model' : 'giving up'}`)
+            break
           }
           // the fallback model can't be used (e.g. renamed): that's not "busy"
           if (!res.ok) {
