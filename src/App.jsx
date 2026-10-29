@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AccountPanel } from './components/AccountPanel'
+import { ChatPanel } from './ai/ChatPanel'
+import { useChat } from './ai/useChat'
+import { useGoal } from './ai/useGoal'
 import { BreakPanel } from './components/BreakPanel'
 import { CoinIcon } from './components/CoinIcon'
 import { CoinPop } from './components/CoinPop'
@@ -60,6 +63,9 @@ export default function App() {
   const auth = useAuth()
   const { profile, settings: gameRules, update: updateProfile, merge: mergeProfile } = useProfile(auth.user)
   const streak = liveStreak(profile)
+
+  // ── Your study goal (from the chat or the goal form) ──
+  const goalApi = useGoal(profile?.id ?? null)
 
   // ── Study mode: easy | medium | toxic (on your profile when logged in) ──
   const [localMode, setLocalMode] = useLocalStorage('studycat:mode', 'easy')
@@ -231,12 +237,14 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar' | 'chat'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
   const prefsRef = useRef(null)
   const subjectRef = useRef(null)
   const calendarRef = useRef(null)
+  const chatRef = useRef(null)
+  const chatButton = useRef(null)
   const calendarOpener = useRef(null) // the 🔥 or the Today pill, whichever opened it
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
@@ -248,7 +256,7 @@ export default function App() {
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
     const from =
-      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener }[openSheet.current] ?? myCatButton
+      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener, chat: chatButton }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
   }, [])
@@ -259,7 +267,16 @@ export default function App() {
   }
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef, chatRef], [])
+
+  // ── Chat with the cat (the AI, logged in only) ──
+  const chat = useChat({ userId: profile?.id ?? null, open: sheet === 'chat' })
+  const situation = focusing ? 'studying' : timer.phase === 'break' ? (summary ? 'after_session' : 'break') : 'idle'
+  const onChatAction = async (action, payload) => {
+    if (action === 'login') return setSheet('account')
+    if (action === 'confirm-goal') return goalApi.saveGoal(payload)
+    if (action === 'edit-goal') return chat.say('Sure! Tell me what to change.')
+  }
 
   // ── Study sessions on the server → coins + streak ──
   const [coinPop, setCoinPop] = useState(null)
@@ -374,6 +391,8 @@ export default function App() {
         coverRefs={coverRefs}
         onBusy={setCatBusy}
         onMeow={() => voice.say(pickLine('meow'), { meow: true })}
+        // tapping the cat (logged in, not while studying) opens the chat, after its meow
+        onCatTap={() => profile && !focusing && !openSheet.current && setTimeout(() => setSheet('chat'), 700)}
       />
 
       <header className={`topbar${profile ? ' signed-in' : ''}`}>
@@ -395,6 +414,16 @@ export default function App() {
               </button>
             </>
           )}
+          <button
+            ref={chatButton}
+            className="icon chat-button"
+            onClick={() => toggleSheet('chat')}
+            aria-expanded={sheet === 'chat'}
+            aria-label="Chat with the cat"
+            title="Chat with the cat"
+          >
+            💬
+          </button>
           <button
             ref={myCatButton}
             className="mycat"
@@ -503,6 +532,16 @@ export default function App() {
         mode={studyMode}
         onModeChange={setStudyMode}
         modeLocked={focusing}
+      />
+      <ChatPanel
+        ref={chatRef}
+        open={sheet === 'chat'}
+        onClose={closeSheet}
+        loggedIn={!!profile}
+        chat={chat}
+        goal={goalApi.goal}
+        situation={situation}
+        onAction={onChatAction}
       />
       <Wardrobe ref={wardrobeRef} open={wardrobeOpen} onClose={closeSheet} look={catLook} onChange={setCatLook} />
       {auth.enabled && (

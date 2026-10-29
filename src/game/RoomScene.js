@@ -80,7 +80,10 @@ export class RoomScene extends Phaser.Scene {
     const sprite = (key) => this.add.sprite(SPOTS.rug, FEET_Y, key, 0).setOrigin(o.x, o.y).setScale(CAT_SCALE)
     this.cat = sprite(catKey(this.look.breed)).setDepth(DEPTH.cat)
     this.cat.setInteractive({ pixelPerfect: true, useHandCursor: true })
-    this.cat.on('pointerdown', () => this.brain.poke())
+    this.cat.on('pointerdown', () => {
+      this.brain.poke()
+      this.bridge.onCatTap?.()
+    })
     // the outfit: a second sprite glued on top of the cat (see syncOutfit)
     this.outfit = sprite(catKey(this.look.breed)).setVisible(false)
     this.applyOutfit(this.look.outfit)
