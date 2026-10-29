@@ -369,6 +369,25 @@ export class CatBrain {
       }
     },
 
+    // the "My Cat" panel is open: come to the middle of the rug (unless
+    // already near it), sit and show off the look
+    async showOff(v) {
+      if (Math.abs(this.cat.x - SPOTS.rug) > 30) {
+        await this.goTo(SPOTS.rug, 'right', v)
+        if (this.stale(v)) return
+      }
+      await this.toPosture('sit', v)
+      while (!this.stale(v)) {
+        await this.once('look_at_you')
+        if (this.stale(v)) return
+        await this.toPosture('front', v) // turn_front: face you
+        await this.hold('sit_front', rand(3, 5), v)
+        if (this.stale(v)) return
+        await this.toPosture('sit', v) // turn_back
+        await this.hold('sit_idle', rand(1, 2), v)
+      }
+    },
+
     // debug only: curl up and stay asleep
     async nap(v) {
       await this.toPosture('sleep', v)

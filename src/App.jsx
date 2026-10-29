@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BreakPanel } from './components/BreakPanel'
 import { GameCanvas } from './game/GameCanvas'
 import { Settings } from './components/Settings'
+import { Wardrobe } from './components/Wardrobe'
 import { useCatVoice } from './hooks/useCatVoice'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useStudyStats } from './hooks/useStudyStats'
@@ -84,7 +85,16 @@ export default function App() {
   const [catBusy, setCatBusy] = useState(true)
   // which cat you have (the shop and coins come later; for now it's saved here)
   const [catLook, setCatLook] = useLocalStorage('studycat:cat', { breed: 'orange', outfit: null })
-  const catGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (sad ? 'sad' : 'study') : 'break'
+  // the "My Cat" wardrobe; while it's open the cat shows off its look
+  const [wardrobeOpen, setWardrobeOpen] = useState(false)
+  const wardrobeRef = useRef(null)
+  const myCatButton = useRef(null)
+  const closeWardrobe = useCallback(() => {
+    setWardrobeOpen(false)
+    myCatButton.current?.focus() // keyboard users land back where they were
+  }, [])
+  const timerGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (sad ? 'sad' : 'study') : 'break'
+  const catGoal = wardrobeOpen ? 'showOff' : timerGoal
   const mood = focusing ? 'focus' : timer.phase === 'break' ? 'break' : 'idle'
 
   // ── Break reactions: Play / Feed / Bathe ──
@@ -115,6 +125,7 @@ export default function App() {
         look={catLook}
         onLookChange={setCatLook}
         panelRef={panelRef}
+        sheetRef={wardrobeRef}
         onBusy={setCatBusy}
         onMeow={() => voice.say(pick(MEOW_LINES))}
       />
@@ -122,6 +133,17 @@ export default function App() {
       <header className="topbar">
         <h1>Study Cat</h1>
         <div className="topbar-right">
+          <button
+            ref={myCatButton}
+            className="mycat"
+            onClick={() => setWardrobeOpen((open) => !open)}
+            aria-expanded={wardrobeOpen}
+            aria-label="My Cat"
+            title="My Cat"
+          >
+            <span aria-hidden="true">🐱</span>
+            <span className="mycat-label"> My Cat</span>
+          </button>
           <span className="today">Today: {todayMinutes} min</span>
           {voice.canSpeak && (
             <button
@@ -141,6 +163,8 @@ export default function App() {
           {bubble}
         </div>
       )}
+
+      <Wardrobe ref={wardrobeRef} open={wardrobeOpen} onClose={closeWardrobe} look={catLook} onChange={setCatLook} />
 
       <main className="panel" ref={panelRef}>
         <div className="phase">{timer.phase === 'study' ? 'Study' : 'Break'}</div>

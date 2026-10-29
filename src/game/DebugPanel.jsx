@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ANIMS } from './catAnims'
 import './debug.css'
 
-const GOALS = ['wander', 'study', 'sad', 'break', 'nap']
+const GOALS = ['wander', 'study', 'sad', 'break', 'showOff', 'nap']
 const TASKS = ['feed', 'play', 'bathe']
 const SPEEDS = [1, 0.5, 0.25, 0.1]
 

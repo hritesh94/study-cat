@@ -55,10 +55,11 @@ function kit(g, ox, oy) {
   }
 }
 
-// The whole room background, as one texture covering x −280…600, y −120…250
-// (wall and floor carry on past the room for wide screens). In texture
-// pixels that's 2640 × 1110, safely under the 4096 limit of most GPUs.
-export const ROOM_TEX = { x: -280, y: -120, w: 880, h: 370 }
+// The whole room background, as one texture covering x −280…600, y −120…320
+// (wall and floor carry on past the room for wide screens, and the floor
+// runs on below, for when an open panel lifts the room). In texture pixels
+// that's 2640 × 1320, safely under the 4096 limit of most GPUs.
+export const ROOM_TEX = { x: -280, y: -120, w: 880, h: 440 }
 
 export function drawRoom(g) {
   const { rect, box, tri, circle, ellipse } = kit(g, -ROOM_TEX.x, -ROOM_TEX.y)
@@ -79,11 +80,11 @@ export function drawRoom(g) {
   rect(L, 122, W, 1, C.inkSoft)
 
   // wooden floor: plank rows get taller toward you, which fakes depth
-  rect(L, 123, W, 160, C.floor)
-  const rows = [123, 129, 136, 144, 153, 163, 175, 189, 205, 224, 246, 270]
+  rect(L, 123, W, 200, C.floor)
+  const rows = [123, 129, 136, 144, 153, 163, 175, 189, 205, 224, 246, 270, 296]
   rows.forEach((y, i) => {
     if (i > 0) rect(L, y, W, 1, C.floorLine)
-    const next = rows[i + 1] ?? 282
+    const next = rows[i + 1] ?? 322
     for (let x = L + ((i * 17) % 48); x < L + W; x += 48) rect(x, y, 1, next - y, C.floorLine)
   })
 

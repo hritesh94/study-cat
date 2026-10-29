@@ -14,7 +14,7 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 //
 // Phaser is big, so it's loaded only when this component mounts
 // (`import()` makes Vite put it in its own file).
-export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, onBusy, onMeow }) {
+export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, sheetRef, onBusy, onMeow }) {
   const hostRef = useRef(null)
   const sceneRef = useRef(null)
   const bridge = useRef({})
@@ -68,11 +68,14 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, onBu
       },
     })
 
-    // how much of the bottom of the screen the timer panel covers
+    // how much of the bottom of the screen the timer panel (or the open
+    // wardrobe, whichever reaches higher) covers
     const measure = () => {
-      const panel = panelRef.current
-      if (!panel || !sceneRef.current) return
-      sceneRef.current.setInset(window.innerHeight - panel.getBoundingClientRect().top)
+      if (!sceneRef.current) return
+      const tops = [panelRef.current, sheetRef?.current]
+        .filter((el) => el && el.offsetHeight > 0) // hidden = not covering anything
+        .map((el) => el.getBoundingClientRect().top)
+      if (tops.length) sceneRef.current.setInset(window.innerHeight - Math.min(...tops))
     }
     const observer = new ResizeObserver((entries) => {
       // Phaser doesn't notice every kind of resize on its own, so nudge it
@@ -81,6 +84,7 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, onBu
     })
     observer.observe(host)
     if (panelRef.current) observer.observe(panelRef.current)
+    if (sheetRef?.current) observer.observe(sheetRef.current)
     window.addEventListener('resize', measure)
 
     Promise.all([import('phaser'), import('./RoomScene')]).then(([{ default: Phaser }, { RoomScene }]) => {
@@ -95,6 +99,11 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, onBu
         banner: false,
         audio: { noAudio: true },
         scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+        // dev only: ?timerloop ticks on timers instead of animation frames,
+        // so automated tests can run in a hidden browser window
+        ...(import.meta.env.DEV && new URLSearchParams(location.search).has('timerloop')
+          ? { fps: { forceSetTimeOut: true, target: 60 } }
+          : {}),
         scene: new RoomScene(bridge.current),
       })
     })
@@ -106,7 +115,7 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, onBu
       game?.destroy(true)
       sceneRef.current = null
     }
-  }, [panelRef])
+  }, [panelRef, sheetRef])
 
   // follow the timer (unless the debug panel took over)
   useEffect(() => {
