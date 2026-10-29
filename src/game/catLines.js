@@ -1518,10 +1518,11 @@ export function pickLine(situation, ctx = {}) {
   return { id: line.id, text: line.text.replaceAll('{n}', String(ctx.n ?? '')), mood: line.mood, pack: fromPack.length > 0 }
 }
 
-// For the personality picker: a friendly sample in each voice.
+// For the personality picker: a sample line in each voice and language.
 export const SAMPLE_LINES = {
-  sweet: 'sweet.en.mid_session.01',
-  diva: 'diva.en.greet.02',
-  gang: 'gang.en.session_start.01',
-  savage: 'savage.en.session_start.02',
+  sweet: { en: 'sweet.en.mid_session.01', hinglish: 'sweet.hinglish.greet.01' },
+  diva: { en: 'diva.en.greet.02', hinglish: 'diva.hinglish.greet.01' },
+  gang: { en: 'gang.en.session_start.01', hinglish: 'gang.hinglish.session_start.01' },
+  savage: { en: 'savage.en.session_start.02', hinglish: 'savage.hinglish.session_start.02' },
 }
+export const sampleLine = (personality, language = 'en') => lineById(SAMPLE_LINES[personality]?.[language] ?? SAMPLE_LINES[personality]?.en ?? SAMPLE_LINES.sweet.en)

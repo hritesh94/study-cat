@@ -752,6 +752,9 @@ export default function App() {
         voice={voice}
         mode={studyMode}
         onModeChange={setStudyMode}
+        catStyle={catStyle}
+        onStyleChange={setCatStyle}
+        onSay={(sample) => voice.say(sample)}
         modeLocked={focusing}
       />
       <ChatPanel

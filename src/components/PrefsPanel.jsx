@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { sampleLine } from '../game/catLines'
 import './Sheet.css'
 import './PrefsPanel.css'
 
@@ -11,8 +12,23 @@ const STRICTNESS = [
   { id: 'toxic', emoji: '😾', name: 'Strict', about: 'Every trip away costs 5 coins, and the cat turns its back on you.' },
 ]
 
-// The ⚙️ settings sheet: sound and study mode (book mode joins on phones).
-export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, children }) {
+// How the cat talks (only its words: what leaving costs is the strictness).
+const PERSONALITIES = [
+  { id: 'sweet', emoji: '😺', name: 'Sweet', about: 'Cozy and gentle.' },
+  { id: 'diva', emoji: '💅', name: 'Diva', about: 'Hypes you like a queen, drags your excuses.' },
+  { id: 'gang', emoji: '🤙', name: 'Gang', about: 'Your Gen Z study buddy. No cap.' },
+  { id: 'savage', emoji: '🔥', name: 'Savage', about: 'Roasts your habits, never you.' },
+]
+const LANGUAGES = [
+  { id: 'en', name: 'English' },
+  { id: 'hinglish', name: 'Hinglish' },
+]
+
+// The ⚙️ settings sheet: the cat's voice (personality, language, spicy),
+// sound, and strictness (book mode joins on phones).
+//   catStyle = { personality, language, spicy }; onStyleChange(fields)
+//   onSay(line): the cat says a sample line
+export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, catStyle, onStyleChange, onSay, children }) {
   const closeButton = useRef(null)
   const [confirmToxic, setConfirmToxic] = useState(false)
   const pickMode = (id) => {
@@ -40,6 +56,58 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
           ×
         </button>
       </header>
+
+      <fieldset className="modes">
+        <legend className="prefs-label">Personality</legend>
+        <div className="mode-list personalities">
+          {PERSONALITIES.map((p) => {
+            const sample = sampleLine(p.id, catStyle.language)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`mode${catStyle.personality === p.id ? ' picked' : ''}`}
+                aria-pressed={catStyle.personality === p.id}
+                onClick={() => {
+                  if (p.id !== catStyle.personality) onStyleChange({ personality: p.id })
+                  onSay(sample) // hear it
+                }}
+              >
+                <span className="mode-name">
+                  <span aria-hidden="true">{p.emoji}</span> {p.name}
+                </span>
+                <span className="mode-about">{p.about}</span>
+                <span className="mode-sample">“{sample.text}”</span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      <div className="prefs-row">
+        <span className="prefs-label">Language</span>
+        <div className="prefs-choices" role="radiogroup" aria-label="Language">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="radio"
+              aria-checked={catStyle.language === l.id}
+              className={catStyle.language === l.id ? 'picked' : ''}
+              onClick={() => onStyleChange({ language: l.id })}
+            >
+              {l.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="prefs-row prefs-spicy">
+        <input type="checkbox" checked={catStyle.spicy} onChange={(e) => onStyleChange({ spicy: e.target.checked })} />
+        <span>
+          <span className="prefs-label">Spicy lines</span> <span className="prefs-note-inline">(contains swearing)</span>
+        </span>
+      </label>
 
       <div className="prefs-row">
         <span className="prefs-label" id="volume-label">

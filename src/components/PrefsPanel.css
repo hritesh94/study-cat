@@ -135,3 +135,39 @@ button.mode.picked {
     min-width: 5.2rem;
   }
 }
+
+/* ── personality, language, spicy ── */
+.mode-list.personalities {
+  grid-template-columns: repeat(2, 1fr);
+}
+.mode-sample {
+  font-family: 'Patrick Hand', cursive;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: var(--ink);
+  opacity: 0.85;
+}
+.prefs-choices {
+  display: flex;
+  gap: 0.4rem;
+}
+.prefs-choices button {
+  font-size: 0.9rem;
+  padding: 0.25rem 0.8rem;
+}
+.prefs-choices button.picked {
+  background: var(--orange);
+  font-weight: 600;
+}
+.prefs-spicy {
+  cursor: pointer;
+}
+.prefs-spicy input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--orange);
+}
+.prefs-note-inline {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

@@ -15,7 +15,7 @@ export function makeStore({ db, admin, userId }) {
     release: async (kind) => must(await admin.rpc('ai_release', { p_user: userId, p_kind: kind })),
 
     settings: async () => must(await db.from('game_settings').select('*').single()),
-    profile: async () => must(await db.from('profiles').select('display_name, current_streak, best_streak, last_study_day, study_mode').eq('id', userId).single()),
+    profile: async () => must(await db.from('profiles').select('display_name, current_streak, best_streak, last_study_day, study_mode, personality, language, spicy').eq('id', userId).single()),
     activeGoal: async () => must(await db.from('goals').select('*').eq('active', true).maybeSingle()),
     goal: async (id) => must(await db.from('goals').select('*').eq('id', id).maybeSingle()),
     latestRoadmap: async (goalId) =>
