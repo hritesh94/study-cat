@@ -95,11 +95,13 @@ export default function App() {
   const subjectTotals = useSubjectTotals({ userId: profile?.id ?? null, version: statsVersion, local: localStats })
   const shownStreak = profile ? streak : localStreaks.current
   const shownBest = profile ? profile.best_streak : localStreaks.best
+  // the streak that broke (the server keeps it until you study again)
+  const lostStreak = profile ? profile.current_streak : localStreaks.last
   const todayCoins = serverToday.days[today]?.coins ?? 0
   const dailyCap = profile ? (gameRules?.daily_coin_cap ?? 300) : 0
   const roomProgress = useMemo(
-    () => ({ subjects: subjectTotals, todayCoins, dailyCap, streak: shownStreak, broken: shownStreak === 0 && shownBest > 0 }),
-    [subjectTotals, todayCoins, dailyCap, shownStreak, shownBest],
+    () => ({ subjects: subjectTotals, todayCoins, dailyCap, streak: shownStreak, broken: shownStreak === 0 && shownBest > 0, lostStreak }),
+    [subjectTotals, todayCoins, dailyCap, shownStreak, shownBest, lostStreak],
   )
 
   const sessionMs = useRef(0) // study time in this session (for the summary card)

@@ -184,27 +184,8 @@ export function drawProps(scene) {
     rect(2, 3, 4, 1, C.purpleDark)
     rect(3, 5, 3, 1, C.purpleDark)
   })
-  // the bath tub, in two layers so the cat can sit IN it
-  make('tubBack', 36, 8, ({ ellipse }) => {
-    ellipse(18, 4, 36, 8, C.ink)
-    ellipse(18, 4, 34, 6, C.water)
-  })
-  make('tubFront', 36, 14, ({ rect }) => {
-    // the lower half of an ellipse, row by row
-    for (let y = 0; y < 12; y++) {
-      const half = Math.round(18 * Math.sqrt(1 - (y / 12) ** 2))
-      rect(18 - half, y, half * 2, 1, C.ink)
-      if (y < 11) rect(19 - half, y, half * 2 - 2, 1, y === 0 ? C.cream : y > 4 && y < 7 ? C.sage : C.cream)
-    }
-    rect(5, 11, 3, 3, C.purple)
-    rect(28, 11, 3, 3, C.purple)
-  })
   make('leaf', 3, 2, ({ rect }) => rect(0, 0, 3, 2, 0xffffff))
   make('pixel', 1, 1, ({ rect }) => rect(0, 0, 1, 1, 0xffffff))
-  make('bubble', 5, 5, ({ circle }) => {
-    circle(2.5, 2.5, 2.5, 0x7fb3cf)
-    circle(2.5, 2.5, 1.5, 0xffffff)
-  })
 
   // the lamp's soft glow (a smooth gradient on purpose — light isn't pixels)
   const glow = scene.textures.createCanvas('glow', 128, 128)
