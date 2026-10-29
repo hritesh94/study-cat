@@ -61,9 +61,12 @@ export class CatBrain {
     this.setBusy(true)
     this.bump()
   }
-  poke() {
+  // clicked (or a happy moment): face you and meow. `silent` skips onMeow,
+  // so the app can say something else (like "+12 coins!").
+  poke({ silent = false } = {}) {
     if (this.clicking || this.paused) return
     this.clickQueued = true
+    this.clickSilent = silent
     this.bump()
   }
   destroy() {
@@ -334,7 +337,8 @@ export class CatBrain {
     this.clicking = true
     await this.toPosture('sit')
     await this.once('turn_front')
-    this.hooks.onMeow?.()
+    if (!this.clickSilent) this.hooks.onMeow?.()
+    this.clickSilent = false
     await this.once('meow')
     await this.once('turn_back')
     this.clicking = false

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BREEDS, OUTFITS, breedThumb, lockStatus, outfitThumb } from '../game/catItems'
+import './Sheet.css'
 import './Wardrobe.css'
 
 const asset = (path) => import.meta.env.BASE_URL + path
@@ -36,8 +37,8 @@ export function Wardrobe({ ref, open, onClose, look, onChange, progress }) {
   const choose = (item) => onChange(tab === 'breeds' ? { ...look, breed: item.id } : { ...look, outfit: item.id })
 
   return (
-    <section ref={ref} className="wardrobe" role="dialog" aria-label="My Cat" hidden={!open}>
-      <header className="wardrobe-head">
+    <section ref={ref} className="sheet" role="dialog" aria-label="My Cat" hidden={!open}>
+      <header className="sheet-head">
         <h2>My Cat</h2>
         <button ref={closeRef} className="icon" onClick={onClose} aria-label="Close My Cat">
           ×

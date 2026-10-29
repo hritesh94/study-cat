@@ -1,0 +1,298 @@
+/* ── Log in / account panel (the sheet itself is in Sheet.css) ── */
+.account {
+  max-width: 460px;
+  overflow-y: auto;
+}
+
+.account-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.account-form,
+.account-me,
+.account-sent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.account-form label,
+.account-rename label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
+.account-form input,
+.account-rename input {
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.7rem;
+}
+
+.account-form .primary {
+  align-self: flex-start;
+}
+
+.account-error {
+  margin: 0;
+  color: #b4473c;
+  font-weight: 500;
+}
+
+.account-sent p {
+  margin: 0;
+}
+.account-sent button {
+  align-self: flex-start;
+}
+.account-big {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.account-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+}
+.account-stats div {
+  padding: 0.4rem 0.3rem;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 14px 18px 12px 16px / 16px 12px 18px 14px;
+  text-align: center;
+}
+.account-stats dt {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.account-stats dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.account-rename {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.account-rename label {
+  flex: 1;
+}
+
+.account-logout {
+  align-self: flex-start;
+}
+
+@media (max-width: 480px) {
+  .account-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── top bar: coins, streak, log in / account ── */
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.65rem;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--wobbly);
+  font-weight: 600;
+  box-shadow: 2px 3px 0 var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stat.bump {
+  animation: stat-bump 0.6s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes stat-bump {
+  40% {
+    transform: scale(1.25) rotate(-4deg);
+    background: #fde9b8;
+  }
+}
+
+button.account-button {
+  max-width: 9.5rem;
+  padding: 0.3rem 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* phones, logged in: room for coins + streak (today's minutes are in the
+   account panel; the name shrinks to just 👤) */
+@media (max-width: 480px) {
+  .topbar.signed-in .today {
+    display: none;
+  }
+  button.account-button .account-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  button.account-button {
+    padding: 0.3rem 0.55rem;
+  }
+  .stat {
+    padding: 0.15rem 0.45rem;
+  }
+  .topbar.signed-in {
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+  .topbar.signed-in h1 {
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+  .topbar.signed-in .topbar-right {
+    gap: 0.35rem;
+  }
+}
+
+button.login-button {
+  padding: 0.3rem 0.85rem;
+  background: var(--orange);
+  font-weight: 600;
+}
+
+/* the gentle note under the timer, when logged out */
+.login-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+.login-note button {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.login-note button:hover {
+  transform: none;
+  box-shadow: none;
+}
+@media (min-width: 721px) {
+  .login-note {
+    grid-column: 1 / -1;
+  }
+}
+.app.focus .login-note {
+  display: none;
+}
+
+/* ── "+N coins" ── */
+.coin-pop {
+  position: absolute;
+  left: clamp(7rem, var(--cat-x), calc(100% - 7rem));
+  top: max(4rem, calc(var(--cat-head-y) - 10px));
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.9rem;
+  background: #fde9b8;
+  border: 3px solid var(--ink);
+  border-radius: var(--wobbly);
+  box-shadow: 3px 4px 0 var(--ink-soft);
+  font-weight: 600;
+  font-size: 1.15rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 5;
+  animation: coin-pop 2.4s ease-out forwards;
+}
+
+@keyframes coin-pop {
+  0% {
+    transform: translate(-50%, -60%) scale(0.5);
+    opacity: 0;
+  }
+  12% {
+    transform: translate(-50%, -110%) scale(1.12);
+    opacity: 1;
+  }
+  20% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -190%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+.coin-pop-sparks {
+  position: absolute;
+  inset: 0;
+}
+.coin-pop-sparks .coin-icon {
+  position: absolute;
+  top: 40%;
+  animation: coin-spark 1.2s ease-out forwards;
+}
+.coin-pop-sparks .coin-icon:nth-child(1) {
+  left: 8%;
+  --dx: -26px;
+}
+.coin-pop-sparks .coin-icon:nth-child(2) {
+  left: 48%;
+  --dx: 2px;
+  animation-delay: 0.08s;
+}
+.coin-pop-sparks .coin-icon:nth-child(3) {
+  right: 8%;
+  --dx: 28px;
+  animation-delay: 0.16s;
+}
+@keyframes coin-spark {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), -46px) scale(1) rotate(200deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no flying: the note just sits there until it's removed */
+  .coin-pop {
+    animation: none;
+  }
+  .coin-pop-sparks,
+  .stat.bump {
+    display: none;
+    animation: none;
+  }
+}
