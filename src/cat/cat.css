@@ -1,82 +1,63 @@
-/* ───────────────────────── Study Cat (2D SVG) ─────────────────────────
-   How this works:
-   • Cat.jsx puts one class on the <svg>, like `cat--reading`.
-   • Rules below say "when the cat is reading, move the paws up, show the book…".
-   • Pose changes use `transition` (smooth blend); loops use `animation`.
-   • Inside SVG, `transform-box: fill-box` makes `transform-origin` relative to
-     the part itself (e.g. "rotate the ear around its own base").
+/* ───────────── Study Cat puppet: paints + face variants ─────────────
+   All movement happens in usePuppet.js. This file only says what the
+   parts look like, and which eye/mouth drawing shows for each expression
+   (the animator sets data-eyes / data-mouth on the head).
 ──────────────────────────────────────────────────────────────────────── */
 
 .cat {
   --ink: #4b3b47;
   --fur: #f2a66a;
+  --fur-far: #e3955c; /* far-side limbs are a touch darker, for depth */
   --fur-dark: #d98a52;
   --cream: #fbf1de;
   --pink: #f2a7a7;
-  --sage: #9cb59a;
-  --sage-dark: #6f8f72;
-  --purple: #9a86b0;
-  --lx: 0;
-  --ly: 0;
-  --tail-speed: 2.6s;
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
 }
 
-/* ── paint ── */
 .cat .fur {
   fill: var(--fur);
   stroke: var(--ink);
-  stroke-width: 5;
+  stroke-width: 4;
   stroke-linejoin: round;
 }
-.cat .cream-fill {
+.cat .far .fur,
+.cat .far-fill {
+  fill: var(--fur-far);
+}
+.cat .sock,
+.cat .cream {
   fill: var(--cream);
   stroke: var(--ink);
-  stroke-width: 4;
+  stroke-width: 3.5;
+  stroke-linejoin: round;
 }
-.cat .no-line {
+.cat .cream {
   stroke: none;
+}
+.cat .line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cat .thin {
+  stroke-width: 3;
+}
+.cat .stripes {
+  fill: none;
+  stroke: var(--fur-dark);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.cat .ear-inner {
+  fill: var(--pink);
+  opacity: 0.85;
 }
 .cat .ink-fill {
   fill: var(--ink);
 }
 .cat .shine {
   fill: #fff;
-}
-.cat .purple-fill {
-  fill: var(--purple);
-  stroke: var(--ink);
-  stroke-width: 4.5;
-  stroke-linejoin: round;
-}
-.cat .sage-fill {
-  fill: var(--sage);
-  stroke: var(--ink);
-  stroke-width: 4.5;
-  stroke-linejoin: round;
-}
-.cat .line {
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.cat .thin {
-  stroke-width: 3.5;
-}
-.cat .ear-inner {
-  fill: var(--pink);
-  opacity: 0.85;
-}
-.cat .stripes {
-  fill: none;
-  stroke: var(--fur-dark);
-  stroke-width: 6;
-  stroke-linecap: round;
 }
 .cat .blush {
   fill: var(--pink);
@@ -85,435 +66,85 @@
 .cat .nose {
   fill: #ee8f97;
   stroke: var(--ink);
-  stroke-width: 3;
+  stroke-width: 2.5;
   stroke-linejoin: round;
 }
-.cat .mouth-open {
+.cat .mouth-fill {
   fill: #c9696f;
   stroke: var(--ink);
-  stroke-width: 3.5;
+  stroke-width: 3;
   stroke-linejoin: round;
 }
 .cat .whiskers {
+  stroke-width: 2.5;
+  opacity: 0.7;
+}
+.cat .lid {
   stroke-width: 3;
-  opacity: 0.75;
-}
-.cat .tail-outline,
-.cat .tail-fur,
-.cat .tail-tip {
-  fill: none;
-  stroke-linecap: round;
-}
-.cat .tail-outline {
-  stroke: var(--ink);
-  stroke-width: 31;
-}
-.cat .tail-fur {
-  stroke: var(--fur);
-  stroke-width: 21;
-}
-.cat .tail-tip {
-  stroke: var(--cream);
-  stroke-width: 21;
 }
 .cat .tear {
   fill: #9fd0ee;
   stroke: var(--ink);
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
-.cat .foam circle {
+.cat .tear {
+  animation: cat-tear 1.6s ease-in infinite;
+}
+.cat .foam,
+.stage .foam {
   fill: #fff;
-  stroke: var(--ink);
-  stroke-width: 3.5;
-}
-.cat .page {
-  fill: #fffaf0;
-  stroke: var(--ink);
-  stroke-width: 3.5;
-  stroke-linejoin: round;
-}
-.cat .text-lines {
+  stroke: var(--ink, #4b3b47);
   stroke-width: 3;
-  opacity: 0.3;
 }
-.cat .kibble circle {
-  fill: #b5774c;
-  stroke: var(--ink);
+.cat .pencil-body,
+.stage .pencil-body {
+  fill: #f2c36a;
+  stroke: #4b3b47;
   stroke-width: 2.5;
 }
-.cat .yarn-lines {
-  stroke: #6f5d86;
-}
-.cat .yarn-string {
-  stroke: var(--purple);
-  stroke-width: 3;
-}
-.cat .heart {
-  fill: #ef7d8f;
-  stroke: var(--ink);
-  stroke-width: 2.2;
+.cat .pencil-tip,
+.stage .pencil-tip {
+  fill: #fbf1de;
+  stroke: #4b3b47;
+  stroke-width: 2.5;
   stroke-linejoin: round;
 }
-.cat .bub {
-  fill: rgba(255, 255, 255, 0.55);
-  stroke: #7fb3cf;
-  stroke-width: 3;
+.cat .pencil-eraser,
+.stage .pencil-eraser {
+  fill: #f2a7a7;
+  stroke: #4b3b47;
+  stroke-width: 2.5;
 }
 
-/* ── things that are hidden unless an animation shows them ── */
-.cat .prop,
-.cat .eyes-happy,
-.cat .eyes-squeeze,
-.cat .brows,
-.cat .mouth-open,
-.cat .mouth-frown {
-  opacity: 0;
+/* ── expressions: hide every variant, then show the ones for this state ── */
+.cat .v {
+  display: none;
 }
-.cat .prop {
-  transform: translateY(8px);
-  transition: opacity 0.35s, transform 0.35s;
-}
-.cat .eyes-open,
-.cat .eyes-happy,
-.cat .eyes-squeeze,
-.cat .brows,
-.cat .mouth-w,
-.cat .mouth-open,
-.cat .mouth-frown {
-  transition: opacity 0.2s;
+.cat-head[data-eyes='open'] .eyes-open,
+.cat-head[data-eyes='half'] .eyes-open,
+.cat-head[data-eyes='half'] .lid,
+.cat-head[data-eyes='sad'] .eyes-open,
+.cat-head[data-eyes='sad'] .brows,
+.cat-head[data-eyes='happy'] .eyes-happy,
+.cat-head[data-eyes='closed'] .eyes-closed,
+.cat-head[data-eyes='squeeze'] .eyes-squeeze,
+.cat-head[data-mouth='smile'] .mouth-smile,
+.cat-head[data-mouth='open'] .mouth-open,
+.cat-head[data-mouth='chew'] .mouth-chew,
+.cat-head[data-mouth='yawn'] .mouth-yawn,
+.cat-head[data-mouth='frown'] .mouth-frown {
+  display: inline;
 }
 
-.cat--reading .book,
-.cat--eating .bowl,
-.cat--feed .bowl,
-.cat--feed .hearts,
-.cat--play .yarn,
-.cat--bathe .bubbles,
-.cat--bathe .foam,
-.cat--sad .tear-g {
-  opacity: 1;
-  transform: none;
-}
-
-/* eyes */
-.cat--eating .eyes-open,
-.cat--feed .eyes-open,
-.cat--bathe .eyes-open {
-  opacity: 0;
-}
-.cat--eating .eyes-happy,
-.cat--feed .eyes-happy,
-.cat--bathe .eyes-squeeze,
-.cat--sad .brows {
-  opacity: 1;
-}
-
-/* mouth */
-.cat--eating .mouth-w,
-.cat--feed .mouth-w,
-.cat--play .mouth-w,
-.cat--bathe .mouth-w,
-.cat--sad .mouth-w {
-  opacity: 0;
-}
-.cat--eating .mouth-open,
-.cat--feed .mouth-open,
-.cat--play .mouth-open,
-.cat--bathe .mouth-open,
-.cat--sad .mouth-frown {
-  opacity: 1;
-}
-
-/* ── idle life: always on ── */
-.cat .breathe {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: cat-breathe 3.6s ease-in-out infinite alternate;
-}
-.cat--sad .breathe {
-  animation-duration: 5.5s; /* slow, sighing breaths */
-}
-
-.cat .eye-blink {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: cat-blink 4.6s infinite;
-}
-
-.cat .tail-pose,
-.cat .tail {
-  transform-box: fill-box;
-  transform-origin: 0% 92%;
-}
-.cat .tail-pose {
-  transition: transform 0.6s ease;
-}
-.cat .tail {
-  animation: cat-swish var(--tail-speed) ease-in-out infinite alternate;
-}
-
-.cat .ear {
-  transform-box: fill-box;
-  transform-origin: 55% 90%;
-  transition: transform 0.4s ease;
-}
-.cat--idle .ear-r,
-.cat--watching .ear-r {
-  animation: cat-ear-twitch 7s infinite;
-}
-
-/* ── poses ── */
-.cat .root,
-.cat .root-loop {
-  transform-origin: 200px 388px;
-}
-.cat .root {
-  transition: transform 0.5s ease;
-}
-.cat .face-pose {
-  transition: transform 0.45s ease;
-}
-.cat .eye-look {
-  transform-box: fill-box;
-  transform-origin: center;
-  transition: transform 0.3s ease;
-}
-.cat .paws-pose {
-  transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
-}
-.cat .mouth-open {
+.cat .mouth-chew {
   transform-box: fill-box;
   transform-origin: top;
-}
-
-/* idle: happy little sway */
-.cat--idle {
-  --tail-speed: 1.8s;
-}
-.cat--idle .root-loop {
-  animation: cat-sway 4s ease-in-out infinite alternate;
-}
-.cat--idle .eye-look {
-  transform: translate(calc(var(--lx) * 4px), calc(var(--ly) * 3px));
-}
-
-/* reading: looks down, paws hold the book, eyes scan the lines */
-.cat--reading {
-  --tail-speed: 4.5s;
-}
-.cat--reading .face-pose {
-  transform: translateY(10px);
-}
-.cat--reading .face-loop {
-  animation: cat-scan 3.2s ease-in-out infinite alternate;
-}
-.cat--reading .eye-look {
-  transform: translateY(4px) scaleY(0.75);
-}
-.cat--reading .paws-pose {
-  transform: translateY(-58px);
-}
-.cat--reading .page-flip {
-  transform-box: fill-box;
-  transform-origin: 0% 50%;
-  animation: cat-page-flip 7s ease-in-out infinite;
-}
-
-/* eating: head down, munching */
-.cat--eating {
-  --tail-speed: 2.2s;
-}
-.cat--eating .face-pose {
-  transform: translateY(14px);
-}
-.cat--eating .face-loop {
-  animation: cat-chew-bob 0.5s ease-in-out infinite alternate;
-}
-.cat--eating .mouth-open,
-.cat--feed .mouth-open {
   animation: cat-chew 0.25s ease-in-out infinite alternate;
 }
 
-/* watching: face and body lean toward your mouse */
-.cat--watching {
-  --tail-speed: 3s;
-}
-.cat--watching .root {
-  transform: rotate(calc(var(--lx) * 3deg));
-  transition-duration: 0.3s;
-}
-.cat--watching .face-pose {
-  transform: translate(calc(var(--lx) * 12px), calc(var(--ly) * 8px));
-  transition-duration: 0.25s;
-}
-.cat--watching .eye-look {
-  transform: translate(calc(var(--lx) * 5px), calc(var(--ly) * 4px));
-}
-
-/* sad: slumped, ears down, tail on the floor, a tear */
-.cat--sad .root {
-  transform: scale(1.02, 0.95);
-}
-.cat--sad .face-pose {
-  transform: translateY(12px);
-}
-.cat--sad .eye-look {
-  transform: translateY(3px);
-}
-.cat--sad .ear {
-  transform: rotate(-32deg) translateY(6px);
-}
-.cat--sad .tail-pose {
-  transform: rotate(58deg);
-}
-.cat--sad .tail {
-  animation: none;
-}
-.cat--sad .tear {
-  animation: cat-tear 1.8s ease-in infinite;
-}
-
-/* play: hopping and batting at the yarn */
-.cat--play {
-  --tail-speed: 0.5s;
-}
-.cat--play .root-loop {
-  animation: cat-hop 0.55s ease-in-out infinite;
-}
-.cat--play .face-pose {
-  transform: translateY(-4px);
-}
-.cat--play .paws-pose {
-  transform: translateY(-40px);
-}
-.cat--play .paw-l {
-  animation: cat-bat 0.3s ease-in-out infinite alternate;
-}
-.cat--play .paw-r {
-  animation: cat-bat 0.3s ease-in-out -0.15s infinite alternate;
-}
-.cat--play .yarn-roll {
-  animation: cat-yarn-roll 1.1s ease-in-out infinite alternate;
-}
-.cat--play .yarn-spin {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: cat-spin 1.1s linear infinite;
-}
-
-/* feed: happy bounce, eyes closed, hearts float up */
-.cat--feed {
-  --tail-speed: 0.7s;
-}
-.cat--feed .root-loop {
-  animation: cat-bounce 0.5s ease-in-out infinite alternate;
-}
-.cat--feed .face-pose {
-  transform: translateY(8px);
-}
-.cat--feed .heart {
-  animation: cat-float-up 1.4s ease-out infinite;
-}
-.cat--feed .heart-2 {
-  animation-delay: -0.7s;
-}
-
-/* bathe: shake it off, bubbles everywhere */
-.cat--bathe {
-  --tail-speed: 0.3s;
-}
-.cat--bathe .root-loop {
-  animation: cat-shake 2.6s ease-out forwards;
-}
-.cat--bathe .ear {
-  transform: rotate(-16deg);
-}
-.cat--bathe .bub {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: cat-bubble 2.2s ease-in-out infinite;
-}
-
-/* ── keyframes ── */
-@keyframes cat-breathe {
-  to {
-    transform: scale(1.012, 1.022);
-  }
-}
-@keyframes cat-blink {
-  0%,
-  93%,
-  100% {
-    transform: scaleY(1);
-  }
-  96% {
-    transform: scaleY(0.1);
-  }
-}
-@keyframes cat-swish {
-  from {
-    transform: rotate(-7deg);
-  }
-  to {
-    transform: rotate(9deg);
-  }
-}
-@keyframes cat-ear-twitch {
-  0%,
-  90%,
-  100% {
-    transform: rotate(0);
-  }
-  93% {
-    transform: rotate(-12deg);
-  }
-  96% {
-    transform: rotate(4deg);
-  }
-}
-@keyframes cat-sway {
-  from {
-    transform: rotate(-1.5deg);
-  }
-  to {
-    transform: rotate(1.5deg);
-  }
-}
-@keyframes cat-scan {
-  from {
-    transform: translateX(-5px);
-  }
-  to {
-    transform: translateX(5px);
-  }
-}
-@keyframes cat-page-flip {
-  0%,
-  78% {
-    transform: scaleX(1);
-    opacity: 0;
-  }
-  80% {
-    opacity: 1;
-  }
-  94% {
-    transform: scaleX(-1);
-    opacity: 1;
-  }
-  95%,
-  100% {
-    transform: scaleX(-1);
-    opacity: 0;
-  }
-}
-@keyframes cat-chew-bob {
-  to {
-    transform: translateY(5px);
-  }
-}
 @keyframes cat-chew {
   to {
-    transform: scaleY(0.4);
+    transform: scaleY(0.35);
   }
 }
 @keyframes cat-tear {
@@ -522,117 +153,11 @@
     opacity: 0;
   }
   15%,
-  75% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(46px);
-    opacity: 0;
-  }
-}
-@keyframes cat-hop {
-  0%,
-  100% {
-    transform: translateY(0) scale(1.04, 0.96);
-  }
-  50% {
-    transform: translateY(-46px) scale(0.97, 1.03);
-  }
-}
-@keyframes cat-bat {
-  to {
-    transform: translateY(-22px);
-  }
-}
-@keyframes cat-yarn-roll {
-  0% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(-26px, -38px);
-  }
-  100% {
-    transform: translate(-52px, 0);
-  }
-}
-@keyframes cat-spin {
-  to {
-    transform: rotate(-360deg);
-  }
-}
-@keyframes cat-bounce {
-  to {
-    transform: translateY(-9px);
-  }
-}
-@keyframes cat-float-up {
-  0% {
-    transform: translateY(6px) scale(0.6);
-    opacity: 0;
-  }
-  25% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-26px) scale(1.1);
-    opacity: 0;
-  }
-}
-@keyframes cat-shake {
-  0%,
-  100% {
-    transform: rotate(0);
-  }
-  6% {
-    transform: rotate(-5deg);
-  }
-  12% {
-    transform: rotate(5deg);
-  }
-  18% {
-    transform: rotate(-5deg);
-  }
-  24% {
-    transform: rotate(4.5deg);
-  }
-  30% {
-    transform: rotate(-4deg);
-  }
-  36% {
-    transform: rotate(3.5deg);
-  }
-  42% {
-    transform: rotate(-3deg);
-  }
-  50% {
-    transform: rotate(2deg);
-  }
-  60% {
-    transform: rotate(-1deg);
-  }
   70% {
-    transform: rotate(0.5deg);
-  }
-}
-@keyframes cat-bubble {
-  0% {
-    transform: translateY(10px) scale(0.5);
-    opacity: 0;
-  }
-  30% {
     opacity: 1;
   }
   100% {
-    transform: translateY(-60px) scale(1.1);
+    transform: translateY(34px);
     opacity: 0;
-  }
-}
-
-/* Respect "reduce motion": keep the gentle stuff, drop the bouncy stuff. */
-@media (prefers-reduced-motion: reduce) {
-  .cat .root-loop,
-  .cat .paw,
-  .cat .yarn-roll {
-    animation: none !important;
   }
 }

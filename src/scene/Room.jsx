@@ -1,6 +1,8 @@
 import './room.css'
 
-// The cozy room behind the cat. Each piece is its own small SVG, placed with
+// The cozy room behind the cat (wall, window, plant, floor).
+// The desk, stool and rug are on the stage instead (cat/CatScene.jsx), so the
+// cat can touch them. Each piece is its own small SVG, placed with
 // CSS (room.css) so it lines up with the floor at any screen size.
 // The room reacts to study/break mode purely through CSS: App.jsx already
 // puts `focus` or `break` on the .app element, and room.css listens for that.
@@ -93,60 +95,6 @@ function Plant() {
   )
 }
 
-function Desk() {
-  return (
-    <svg className="room-desk" viewBox="0 0 400 300">
-      {/* lamp (left end of the desk, so it glows near the cat) */}
-      <ellipse className="purple" cx="84" cy="148" rx="32" ry="9" />
-      <path className="lamp-arm" d="M84 146 Q62 112 86 58" />
-      <ellipse className="lamp-bulb" cx="86" cy="96" rx="20" ry="8" />
-      <path className="lamp-shade" d="M42 94 Q46 50 86 46 Q126 50 130 94 Z" />
-
-      {/* steaming mug */}
-      <g className="steam">
-        <path d="M186 102 C178 92 194 84 186 72" />
-        <path d="M198 100 C190 88 206 80 198 66" />
-        <path d="M210 102 C202 92 218 84 210 72" />
-      </g>
-      <path className="mug-handle" d="M216 122 C234 122 234 144 216 144" />
-      <rect className="cream" x="176" y="110" width="42" height="42" rx="9" />
-      <rect className="mug-stripe" x="178" y="124" width="38" height="8" />
-
-      {/* book stack */}
-      <rect className="purple" x="284" y="132" width="90" height="18" rx="4" />
-      <rect className="sage" x="292" y="115" width="76" height="17" rx="4" />
-      <rect className="orange" x="280" y="98" width="94" height="17" rx="4" />
-      <path className="spine" d="M296 132 V150 M304 115 V132 M292 98 V115" />
-
-      {/* the desk itself */}
-      <rect className="wood" x="10" y="150" width="380" height="22" rx="8" />
-      <rect className="wood-dark" x="30" y="170" width="20" height="126" rx="6" />
-      <rect className="wood" x="252" y="170" width="126" height="126" rx="8" />
-      <rect className="wood-light" x="264" y="184" width="102" height="44" rx="7" />
-      <rect className="wood-light" x="264" y="238" width="102" height="44" rx="7" />
-      <circle className="knob" cx="315" cy="206" r="6" />
-      <circle className="knob" cx="315" cy="260" r="6" />
-    </svg>
-  )
-}
-
-function Picture() {
-  return (
-    <svg className="room-picture" viewBox="0 0 120 100">
-      <rect className="wood" x="4" y="4" width="112" height="92" rx="10" />
-      <rect className="cream" x="16" y="16" width="88" height="68" rx="5" />
-      {/* a little paw print */}
-      <g className="paw-print">
-        <ellipse cx="60" cy="58" rx="15" ry="12" />
-        <circle cx="42" cy="40" r="6" />
-        <circle cx="54" cy="33" r="6" />
-        <circle cx="67" cy="33" r="6" />
-        <circle cx="78" cy="40" r="6" />
-      </g>
-    </svg>
-  )
-}
-
 function Floor() {
   // Planks get taller toward the bottom, which fakes a bit of depth.
   const rows = [0, 14, 31, 51, 74, 100]
@@ -176,19 +124,12 @@ export function Room() {
       <div className="room-wall" />
       <div className="room-wainscot" />
       <Window />
-      <Picture />
       <Floor />
       <div className="room-baseboard" />
-      <svg className="room-rug" viewBox="0 0 400 80" preserveAspectRatio="none">
-        <ellipse className="rug" cx="200" cy="40" rx="196" ry="36" vectorEffect="non-scaling-stroke" />
-        <ellipse className="rug-stitch" cx="200" cy="40" rx="172" ry="26" vectorEffect="non-scaling-stroke" />
-      </svg>
       <Plant />
-      <Desk />
       {/* lighting layers, faded in/out by mode */}
       <div className="room-dim" />
       <div className="room-bright" />
-      <div className="room-glow" />
     </div>
   )
 }

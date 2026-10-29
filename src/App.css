@@ -1,11 +1,14 @@
 .app {
-  /* shared layout: the room, cat and speech bubble all line up from these */
+  /* shared layout: the room, the stage (desk + cat) and the speech bubble
+     all line up from these */
   --floor: 40vh;
-  --cat-size: min(42vh, 380px);
-  --cat-bottom: calc(var(--floor) - 7vh);
-  --desk-w: clamp(240px, 28vw, 440px);
-  --desk-right: 4vw;
-  --desk-bottom: calc(var(--floor) - 4vh);
+  --stage-h: min(62vh, 680px);
+  --s: calc(var(--stage-h) / 520); /* size of one stage unit on screen */
+  /* the stage's floor line (y 470 of 520) sits on the room's floor line */
+  --stage-bottom: calc(var(--floor) - var(--stage-h) * 50 / 520);
+  /* where the cat's head is, in stage units (for the speech bubble) */
+  --head-x: 288;
+  --head-top: 294;
 
   position: relative;
   height: 100%;
@@ -13,14 +16,17 @@
   background: var(--wall);
 }
 
-/* Phones: taller floor (the panel is taller), smaller cat, desk peeks in from the right. */
+/* studying = the cat is up on the stool */
+.app.focus {
+  --head-x: 372;
+  --head-top: 104;
+}
+
+/* Phones: taller floor (the panel is taller), slightly smaller stage. */
 @media (max-width: 720px) {
   .app {
     --floor: 46vh;
-    --cat-size: min(34vh, 300px, 84vw);
-    --cat-bottom: calc(var(--floor) - 6vh);
-    --desk-w: 220px;
-    --desk-right: -70px;
+    --stage-h: min(46vh, 420px);
   }
   .panel {
     gap: 0.5rem;
@@ -32,16 +38,13 @@
   .settings input {
     width: 3.2rem;
   }
-}
-
-.cat-stage {
-  position: absolute;
-  left: 50%;
-  bottom: var(--cat-bottom);
-  width: var(--cat-size);
-  height: var(--cat-size);
-  transform: translateX(-50%);
-  z-index: 1;
+  /* keep each row of buttons on one line, so the panel stays below the cat */
+  .panel button {
+    padding: 0.4rem 0.75rem;
+  }
+  .app .bubble {
+    font-size: 1.2rem;
+  }
 }
 
 /* ── top bar ── */
@@ -92,8 +95,9 @@ button.icon {
 /* ── speech bubble above the cat ── */
 .bubble {
   position: absolute;
-  left: 50%;
-  bottom: calc(var(--cat-bottom) + var(--cat-size) * 0.98);
+  /* above the cat's head, but never off the edge of the screen */
+  left: clamp(9rem, calc(50% + (var(--head-x) - 400) * var(--s)), calc(100% - 9rem));
+  bottom: calc(var(--stage-bottom) + (520 - var(--head-top)) * var(--s) + 10px);
   transform: translateX(-50%);
   max-width: min(420px, calc(100% - 32px));
   width: max-content;
