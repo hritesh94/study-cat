@@ -10,7 +10,7 @@ import './GoalForm.css'
 
 const LEVELS = ['weak', 'okay', 'strong']
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const DEFAULT_TITLES = { neet: 'NEET UG', jee_main: 'JEE Main', boards: 'Board exams', custom: '' }
+const DEFAULT_TITLES = { neet: 'NEET UG', neet_pg: 'NEET PG', jee_main: 'JEE Main', boards: 'Board exams', custom: '' }
 
 const initial = (start) => {
   const kind = start?.kind ?? 'neet'

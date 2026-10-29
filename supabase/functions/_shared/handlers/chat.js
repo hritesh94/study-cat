@@ -18,7 +18,7 @@ import { clip, isDay, num, oneOf, text, timeZone as validTimeZone } from '../val
 // The first thing the cat says when there's no goal yet (the app shows the same line).
 export const ONBOARDING_HELLO = "Mrrp, hi! I'm your study cat. What are you studying for?"
 
-const KINDS = ['neet', 'jee_main', 'boards', 'custom']
+const KINDS = ['neet', 'neet_pg', 'jee_main', 'boards', 'custom']
 const LEVELS = ['weak', 'okay', 'strong']
 const SUGGESTIONS = ['none', 'roadmap', 'quiz', 'goal']
 const SITUATIONS = {
@@ -27,7 +27,7 @@ const SITUATIONS = {
   break: 'They are on a break between study sessions.',
   after_session: 'They just finished a study session.',
 }
-const TITLES = { neet: 'NEET UG', jee_main: 'JEE Main', boards: 'Board exams', custom: 'My goal' }
+const TITLES = { neet: 'NEET UG', neet_pg: 'NEET PG', jee_main: 'JEE Main', boards: 'Board exams', custom: 'My goal' }
 
 export const CHAT_SCHEMA = {
   type: 'object',
@@ -64,12 +64,12 @@ const CHAT_TASK = (alreadySuggested) => `TASK: Chat with the student. Reply in 1
 - "goal" is always null here.`
 
 const ONBOARDING_TASK = `TASK: The student has no study goal yet. Help them set one, chatting like a friend. Ask ONE short question at a time, in this order, skipping anything they already told you:
-1. what they're studying for (NEET UG, JEE Main, board exams, or something else)
+1. what they're studying for (NEET UG after class 12, NEET PG after MBBS, JEE Main, board exams, or something else). If they just say "NEET", ask whether it's NEET UG or NEET PG.
 2. the deadline or exam date
 3. how many hours a day they can study
 4. which subjects feel weak and which feel strong
 If they want to talk about something else, answer kindly, then gently come back to the next question. Reply in 1 to 3 short sentences.
-When you know all four, fill in "goal": kind is neet, jee_main, boards or custom; title is short (e.g. "NEET UG 2027"); deadline is YYYY-MM-DD (use today's date to work out the year); hours_per_day is a number; subjects lists each subject with level weak, okay or strong (NEET: Physics, Chemistry, Biology. JEE Main: Physics, Chemistry, Maths). Then "reply" sums it up in one sentence and asks them to check it. Until then "goal" is null. suggest is "none".`
+When you know all four, fill in "goal": kind is neet (NEET UG), neet_pg, jee_main, boards or custom; title is short (e.g. "NEET UG 2027"); deadline is YYYY-MM-DD (use today's date to work out the year); hours_per_day is a number; subjects lists each subject with level weak, okay or strong (NEET UG: Physics, Chemistry, Biology. NEET PG: the MBBS subjects they mention, e.g. Anatomy, Pathology, Medicine, Surgery. JEE Main: Physics, Chemistry, Maths). Then "reply" sums it up in one sentence and asks them to check it. Until then "goal" is null. suggest is "none".`
 
 // the goal from onboarding: checked field by field, or null
 export function validGoal(goal, today) {

@@ -4,7 +4,8 @@
 // paste or photograph.
 import { JEE_MAIN } from './jee-main'
 import { NEET_UG } from './neet'
+import { NEET_PG } from './neet-pg'
 
-export const SYLLABI = { neet: NEET_UG, jee_main: JEE_MAIN }
+export const SYLLABI = { neet: NEET_UG, neet_pg: NEET_PG, jee_main: JEE_MAIN }
 
 export const syllabusFor = (kind) => SYLLABI[kind] ?? null

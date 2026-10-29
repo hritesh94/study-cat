@@ -11,6 +11,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dayTarget } from '../src/ai/schedule.js'
+import { NEET_PG } from '../src/data/syllabus/neet-pg.js'
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations')
 const db = await PGlite.create()
@@ -542,6 +543,14 @@ check('the report function saves a report', r.rows.length === 1, r.error ?? '')
 r = await asService(`insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, '{}', 'again', 'again')`, [D, monday])
 check('one report per week', r.error?.includes('duplicate') || r.error?.includes('unique'), r.error ?? 'no error')
 check('Dee reads her report, Ana does not', (await as(D, `select summary from public.weekly_reports`)).rows.length === 1 && (await as(A, `select summary from public.weekly_reports`)).rows.length === 0)
+
+console.log('\nNEET PG goals (migration 12)')
+const F = '66666666-6666-6666-6666-666666666666'
+await admin(`insert into auth.users (id, email) values ($1, 'fay@example.com')`, [F])
+r = await as(F, `insert into public.goals (kind, title, deadline, hours_per_day, chapters) values ('neet_pg', 'NEET PG 2027', '2027-08-15', 8, $1) returning kind, jsonb_array_length(chapters) as n`, [JSON.stringify(NEET_PG.chapters)])
+check('a NEET PG goal with all its topics can be saved', r.rows[0]?.kind === 'neet_pg' && r.rows[0].n === NEET_PG.chapters.length, r.error ?? '')
+r = await as(F, `update public.goals set kind = 'mbbs' where user_id = $1`, [F])
+check('goal types are still a fixed list', r.error !== null)
 
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {

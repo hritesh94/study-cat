@@ -439,6 +439,7 @@ Commits: `d22bbe7` AI core, `479c7ca` part 1 (chat), `0a02724` part 2 (goals and
    9. `supabase/migrations/20261030000009_roadmaps_bonus.sql`
    10. `supabase/migrations/20261030000010_quizzes.sql`
    11. `supabase/migrations/20261030000011_weekly_reports.sql`
+   12. `supabase/migrations/20261030000012_neet_pg.sql` (added later: allows NEET PG goals)
 
    They're safe for the live site, which doesn't use them yet: they only add things. `end_session` keeps the same inputs, and `daily_totals` just gets one more column (the 👑).
 5. **Deploy the 4 Edge Functions** (chat, roadmap, quiz, report): `npx supabase functions deploy --use-api`. ✅ Done: steps 1–5 were done on 2026-10-30, and the chat answered. (`--use-api` builds them on Supabase's side, so Docker isn't needed.)
@@ -487,8 +488,9 @@ The live app (on `main`) doesn't have the AI yet: it comes with the merge, after
 1. **Syllabus data:** `src/data/syllabus/neet.js` (72 chapters: Physics and Chemistry by official unit, Biology split into its NCERT chapters) and `jee-main.js` (54 units). Each chapter has an id, subject, name and a **rough** weightage (high / medium / low, from past papers, not official). Last checked 2026-10-30.
    - Sources: the NMC's "Updated syllabus for NEET UG 2026" (nmc.org.in; Careers360 reported no chapters removed) and NTA's JEE Main 2026 syllabus (jeemain.nta.nic.in; unchanged since the 2024 cut).
    - ⚠️ **Please double-check both against the official PDFs**: I couldn't open the PDFs themselves, and the 2027 syllabus may differ.
+   - **NEET PG** (added after the first real chat, when the goal turned out to be NEET PG, not UG): `src/data/syllabus/neet-pg.js` has the **19 MBBS subjects** (official: NBEMS says the syllabus is the NMC's MBBS curriculum) split into **93 main topics**. The topics and the weightage are our own grouping and a rough guide, since NBEMS publishes neither; double-check against the NEET PG bulletin on natboard.edu.in. When someone just says "NEET", the cat asks "UG or PG?".
 2. **Goals** come from the chat or the **🎯 Set a goal** form:
-   - type (NEET, JEE Main, board exams, something else), deadline, hours a day, a lighter weekday, a level per subject, and chapters already done
+   - type (NEET UG, NEET PG, JEE Main, board exams, something else), deadline, hours a day, a lighter weekday, a level per subject, and chapters already done
    - "something else" and boards: describe it, and paste or photograph the syllabus
 3. **The AI plans only the big picture** (JSON): chapter order, hours per chapter, phases (learn / revise / mock), weekly milestones and a feasibility check.
    - Syllabus chapters keep their own ids and names (anything the AI invents is dropped, anything it forgets is added at the end).
@@ -521,7 +523,7 @@ The live app (on `main`) doesn't have the AI yet: it comes with the merge, after
 - Each week is written once and kept (`weekly_reports`), so opening it again is free. A week with no study gets a kind note without asking the AI.
 
 #### Tested
-- `npm run test:ai` (new): **122 checks**, in Node with a fake AI and a fake database. It covers:
+- `npm run test:ai` (new): **125 checks**, in Node with a fake AI and a fake database. It covers:
   - the Gemini request (key in the header, schema, limits, low thinking), skipping its thinking, and busy models (429 retry, straight to the backup on "high demand" or a time-out, then "tired")
   - the prompt order (catVoice first, safety last)
   - distress detection (8 serious messages caught, 5 idioms not)
@@ -530,7 +532,7 @@ The live app (on `main`) doesn't have the AI yet: it comes with the merge, after
   - the crisis reply even with the limit used up or the AI down
   - roadmap checks (dropped and added chapters, honest feasibility), the schedule (light day, carry-over, buffer, missed days, too much work)
   - quiz checks (answers never sent), and the report (database numbers, once per week, no AI for an empty week)
-- `npm run test:db`: **161 checks** (the 89 from before, all still passing). It covers:
+- `npm run test:db`: **163 checks** (the 89 from before, all still passing). It covers:
   - limits: only the server key may reserve, 30 / 3 / 10 / 1, per user, given back but never below 0
   - row security on chat, goals, roadmaps, bonus coins, quizzes and reports
   - the daily goal bonus (not before the target, +15 once, the 👑, the cap)
@@ -577,7 +579,7 @@ study-cat/
 ├─ scripts/export-lines.mjs writes voice-lines.csv (npm run voice:lines)
 ├─ voice-lines.csv          every cat line with its id, for recording
 ├─ CREDITS.md               where every sound comes from (all CC0)
-├─ supabase/migrations/     the 11 SQL files to paste into Supabase, in order
+├─ supabase/migrations/     the 12 SQL files to paste into Supabase, in order
 ├─ supabase/functions/      the AI Edge Functions: chat, roadmap, quiz, report (+ _shared/)
 ├─ supabase/config.toml     Supabase CLI settings (the functions need a login)
 ├─ .env.local               your Supabase URL + publishable key (NOT committed)
@@ -592,7 +594,7 @@ study-cat/
    ├─ lib/calendar.js       dates for the calendar, the 4 day levels, local streaks
    ├─ ai/                   the AI screens: chat, goal form, roadmap, ring, quiz, report;
    │                        client.js (calls + kind errors), schedule.js (days, no AI)
-   ├─ data/syllabus/        NEET UG and JEE Main chapters (double-check the official PDFs)
+   ├─ data/syllabus/        NEET UG, NEET PG and JEE Main chapters (double-check the official PDFs)
    ├─ hooks/                useTimer, useStudyStats, useCatVoice, useLocalStorage,
    │                        useAuth, useProfile, useStudySessions, useLeaveTracker,
    │                        useWakeLock, useSubjects, useDailyTotals, useSubjectTotals
@@ -651,8 +653,8 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run preview` | Serves the built `dist/` locally, to check the release version |
 | `npm run lint` | Checks the code for common mistakes (oxlint) |
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
-| `npm run test:db` | Tests the Supabase migrations locally (pretend users, 161 checks) |
-| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (122 checks) |
+| `npm run test:db` | Tests the Supabase migrations locally (pretend users, 163 checks) |
+| `npm run test:ai` | Tests the AI functions' logic with a fake AI and database (125 checks) |
 | `npx supabase functions deploy --use-api` | Deploys the 4 AI functions (after `npx supabase login` and `link`) |
 | `npx supabase secrets list` | Shows which secrets are set (never their values) |
 | `npm run voice:lines` | Writes every cat line with its id to `voice-lines.csv` |

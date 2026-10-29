@@ -19,6 +19,7 @@ import { availableHours, roadmap } from '../supabase/functions/_shared/handlers/
 import { quiz, validQuestions } from '../supabase/functions/_shared/handlers/quiz.js'
 import { describeWeek, mondayOf, report } from '../supabase/functions/_shared/handlers/report.js'
 import { buildSchedule, dayTarget } from '../src/ai/schedule.js'
+import { NEET_PG } from '../src/data/syllabus/neet-pg.js'
 
 let passed = 0
 const failures = []
@@ -430,6 +431,17 @@ console.log('\nWeekly report (numbers from the database, words from the AI)')
   store = reportStore()
   check('an empty AI answer is refused (and the call given back)', (await throwsCode(() => report({}, deps(store, fakeAi({ summary: '', tip: '' }))), 'bad_output')) === true && store.used === 0)
   check('describeWeek handles a week without subjects', describeWeek({ ...stats, subjects: [], best_day: null }, { streak: 0, bestStreak: 0, roadmap: null }).includes('No best day'))
+}
+
+console.log('\nNEET PG')
+{
+  const g = validGoal({ kind: 'neet_pg', title: '', deadline: '2027-08-15', hours_per_day: 8, subjects: [{ name: 'Pathology', level: 'weak' }] }, '2026-10-30')
+  check('a NEET PG goal from the chat is accepted (with a default title)', g?.kind === 'neet_pg' && g.title === 'NEET PG', JSON.stringify(g))
+  const store = fakeStore({ goal: null })
+  const ai = fakeAi({ reply: 'NEET UG or NEET PG?', distress: false, suggest: 'none', goal: null })
+  await chat({ message: 'I am preparing for NEET' }, deps(store, ai))
+  check('onboarding asks "UG or PG?" when they just say NEET', ai.calls[0].system.includes('ask whether it\'s NEET UG or NEET PG') && ai.calls[0].schema.properties.goal.properties.kind.enum.includes('neet_pg'))
+  check('the built-in NEET PG syllabus: 19 subjects, every topic in one of them, unique ids', NEET_PG.subjects.length === 19 && NEET_PG.chapters.every((c) => NEET_PG.subjects.includes(c.subject)) && new Set(NEET_PG.chapters.map((c) => c.id)).size === NEET_PG.chapters.length)
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`)

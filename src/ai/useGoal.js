@@ -3,7 +3,7 @@ import { syllabusFor } from '../data/syllabus'
 import { localDay, supabase } from '../lib/supabase'
 import { askCat } from './client'
 
-export const GOAL_KINDS = { neet: 'NEET UG', jee_main: 'JEE Main', boards: 'Board exams', custom: 'Something else' }
+export const GOAL_KINDS = { neet: 'NEET UG', neet_pg: 'NEET PG', jee_main: 'JEE Main', boards: 'Board exams', custom: 'Something else' }
 
 // Your active goal (table goals) and its latest roadmap (table roadmaps).
 // There's at most one active goal; setting a new one retires the old one.
