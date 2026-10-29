@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { CatScene } from './cat/CatScene'
-import { useStudyCycle } from './cat/useStudyCycle'
 import { BreakPanel } from './components/BreakPanel'
+import { GameCanvas } from './game/GameCanvas'
 import { Settings } from './components/Settings'
 import { useCatVoice } from './hooks/useCatVoice'
 import { useLocalStorage } from './hooks/useLocalStorage'
@@ -12,6 +11,7 @@ import './App.css'
 const BREAK_LINE = 'Enough studying, play with me!'
 const START_LINES = ["Let's focus!", "Study time! I'll keep you company.", 'You got this!']
 const COME_BACK_LINES = ['Hey! Where did you go?', 'You left me all alone...', 'No sneaking off!']
+const MEOW_LINES = ['Meow!', 'Mrrp?', 'Meow meow!']
 const pick = (lines) => lines[Math.floor(Math.random() * lines.length)]
 
 // Browsers only allow fullscreen right after a click, so we call this from
@@ -46,7 +46,6 @@ export default function App() {
   })
 
   const focusing = timer.phase === 'study' && timer.running
-  const studyAnimation = useStudyCycle(focusing)
 
   // ── Sad cat: switching tabs during study ──
   const [sad, setSad] = useState(false)
@@ -77,18 +76,20 @@ export default function App() {
     }
   }, [])
 
-  // ── Break reactions: Play / Feed / Bathe ──
-  const [reaction, setReaction] = useState(null)
-  const reactionTimer = useRef()
-  const doBreakAction = (action) => {
-    setReaction(action.animation)
-    voice.say(action.line)
-    clearTimeout(reactionTimer.current)
-    reactionTimer.current = setTimeout(() => setReaction(null), 3000)
-  }
+  // ── The cat (a Phaser game) ──
+  // React decides WHAT the cat should be doing; the cat's brain decides HOW
+  // to get there (walking, sitting down, turning around…).
+  const game = useRef(null)
+  const panelRef = useRef(null)
+  const [catBusy, setCatBusy] = useState(true)
+  const catGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (sad ? 'sad' : 'study') : 'break'
+  const mood = focusing ? 'focus' : timer.phase === 'break' ? 'break' : 'idle'
 
-  // Which animation wins when several apply? Reaction > sad > studying > idle.
-  const catAnimation = reaction ?? (sad ? 'sad' : focusing ? studyAnimation : 'idle')
+  // ── Break reactions: Play / Feed / Bathe ──
+  const doBreakAction = (action) => {
+    voice.say(action.line)
+    game.current?.command(action.animation)
+  }
   const bubble = voice.line ?? (timer.phase === 'break' ? BREAK_LINE : null)
 
   const start = () => {
@@ -105,7 +106,14 @@ export default function App() {
 
   return (
     <div className={`app ${focusing ? 'focus' : ''} ${timer.phase}`}>
-      <CatScene animation={catAnimation} />
+      <GameCanvas
+        ref={game}
+        goal={catGoal}
+        mood={mood}
+        panelRef={panelRef}
+        onBusy={setCatBusy}
+        onMeow={() => voice.say(pick(MEOW_LINES))}
+      />
 
       <header className="topbar">
         <h1>Study Cat</h1>
@@ -130,10 +138,10 @@ export default function App() {
         </div>
       )}
 
-      <main className="panel">
+      <main className="panel" ref={panelRef}>
         <div className="phase">{timer.phase === 'study' ? 'Study' : 'Break'}</div>
         <div className="time">{formatTime(timer.remainingMs)}</div>
-        {timer.phase === 'break' && <BreakPanel onAction={doBreakAction} busy={reaction !== null} />}
+        {timer.phase === 'break' && <BreakPanel onAction={doBreakAction} busy={catBusy} />}
         <div className="controls">
           {timer.running ? (
             <button onClick={pause}>Pause</button>

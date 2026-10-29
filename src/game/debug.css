@@ -1,0 +1,86 @@
+.debug {
+  position: fixed;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 50;
+  width: min(300px, calc(100% - 1.2rem));
+  max-height: calc(100% - 1.2rem);
+  overflow: auto;
+  padding: 0.6rem 0.75rem 0.75rem;
+  background: rgba(255, 250, 240, 0.95);
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.debug-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.debug h3 {
+  margin: 0.7rem 0 0.3rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.debug-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+/* small, plain buttons (override the chunky hand-drawn style) */
+.debug button {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  border-width: 1.5px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.debug button:hover {
+  transform: none;
+  box-shadow: none;
+  background: var(--sage-light);
+}
+.debug button.on {
+  background: var(--orange);
+}
+
+.debug-follow {
+  margin-top: 0.4rem;
+}
+
+.debug-state {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.6rem;
+  margin: 0.5rem 0 0;
+  font-family: ui-monospace, monospace;
+}
+.debug-state dt {
+  color: var(--muted);
+}
+.debug-state dd {
+  margin: 0;
+}
+.debug-state .good {
+  color: #4f7a52;
+}
+.debug-state .bad {
+  color: #c0392b;
+  font-weight: 700;
+}
+
+.debug-toggle {
+  position: fixed;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 50;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+}

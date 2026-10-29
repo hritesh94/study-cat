@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# cat generator output (python anims.py)
+tools/cat-generator/out/

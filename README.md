@@ -1,7 +1,7 @@
 # Study Cat 🐱
 
 A cozy 2D storybook Pomodoro timer: a cat keeps you company in a warm little room while you study.
-Built with React + Vite + SVG.
+Built with React + Vite + Phaser (pixel art).
 
 **Live:** https://study-cat-pink.vercel.app · **Full build history and explanations:** [PROJECT_LOG.md](PROJECT_LOG.md)
 
@@ -27,20 +27,21 @@ src/
   components/
     Settings.jsx          study/break length inputs
     BreakPanel.jsx        Play / Feed / Bathe buttons
-  cat/
-    catConfig.js          the animation names (the cat's "contract")
-    poses.js              rig sizes, every pose and action (edit here!)
-    rig.js                inverse kinematics + blending math
-    usePuppet.js          the animator: pose blending + idle life
-    Cat.jsx               the puppet: one <g> per jointed body part
-    CatScene.jsx          room + stage (desk, stool, props, cat)
-    useStudyCycle.js      rotates the study actions while you focus
-  scene/
-    Room.jsx              wall, window, plant, floor
+  game/
+    GameCanvas.jsx        React <-> Phaser bridge
+    RoomScene.js          the Phaser scene: pixel room, cat, camera, lighting
+    catBrain.js           the cat's state machine (goals, tasks, scripts)
+    catAnims.js           each animation's start/end posture + chain route-finder
+    layout.js             spots and prop positions (game pixels)
+    roomArt.js            the pixel-art room and props
+    DebugPanel.jsx        the ?debug panel
+public/game/cat/          sprite sheet + JSON
+tools/cat-generator/      the sprite pack's generator, previews, README (not deployed)
 ```
 
-## Adding cat actions
+## The cat
 
-The cat is a rigged SVG puppet. Poses are joint angles (or paw targets) in `src/cat/poses.js`,
-and actions are short lists of poses. See "Adding a new action" in [PROJECT_LOG.md](PROJECT_LOG.md).
-While `npm run dev` runs, try `studyCat.play('pageTurn')` in the browser console.
+The cat is a sprite pack (see `tools/cat-generator/README.md`) driven by a state machine in
+`src/game/catBrain.js`. It only moves through the pack's transition chains, so it never snaps.
+Open `http://localhost:5173/?debug` for buttons for every animation and state, plus slow motion.
+More in [PROJECT_LOG.md](PROJECT_LOG.md) (step 13).

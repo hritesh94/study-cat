@@ -1,33 +1,25 @@
 .app {
-  /* shared layout: the room, the stage (desk + cat) and the speech bubble
-     all line up from these */
-  --floor: 40vh;
-  --stage-h: min(62vh, 680px);
-  --s: calc(var(--stage-h) / 520); /* size of one stage unit on screen */
-  /* the stage's floor line (y 470 of 520) sits on the room's floor line */
-  --stage-bottom: calc(var(--floor) - var(--stage-h) * 50 / 520);
-  /* where the cat's head is, in stage units (for the speech bubble) */
-  --head-x: 288;
-  --head-top: 294;
-
   position: relative;
   height: 100%;
   overflow: hidden;
   background: var(--wall);
+  /* the game writes the cat's head position here, for the speech bubble */
+  --cat-x: 50%;
+  --cat-head-y: 40%;
 }
 
-/* studying = the cat is up on the stool */
-.app.focus {
-  --head-x: 372;
-  --head-top: 104;
+/* the Phaser canvas fills the screen, behind the UI */
+.game {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.game canvas {
+  display: block;
 }
 
-/* Phones: taller floor (the panel is taller), slightly smaller stage. */
+/* Phones: a more compact panel, so more of the room shows */
 @media (max-width: 720px) {
-  .app {
-    --floor: 46vh;
-    --stage-h: min(46vh, 420px);
-  }
   .panel {
     gap: 0.5rem;
     padding: 0.8rem 1rem 1rem;
@@ -95,10 +87,11 @@ button.icon {
 /* ── speech bubble above the cat ── */
 .bubble {
   position: absolute;
-  /* above the cat's head, but never off the edge of the screen */
-  left: clamp(9rem, calc(50% + (var(--head-x) - 400) * var(--s)), calc(100% - 9rem));
-  bottom: calc(var(--stage-bottom) + (520 - var(--head-top)) * var(--s) + 10px);
-  transform: translateX(-50%);
+  /* above the cat's head (it follows the cat), but never off the screen */
+  left: clamp(9rem, var(--cat-x), calc(100% - 9rem));
+  top: max(4rem, calc(var(--cat-head-y) - 18px));
+  transform: translate(-50%, -100%);
+  pointer-events: none;
   max-width: min(420px, calc(100% - 32px));
   width: max-content;
   padding: 0.45rem 1.2rem 0.55rem;
@@ -139,7 +132,7 @@ button.icon {
 
 @keyframes pop {
   from {
-    transform: translateX(-50%) scale(0.7) rotate(-4deg);
+    transform: translate(-50%, -100%) scale(0.7) rotate(-4deg);
     opacity: 0;
   }
 }
