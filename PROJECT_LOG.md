@@ -2,9 +2,10 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app
-**Stack:** React 19 + Vite 8, with a rigged 2D SVG cat puppet and room (no 3D or animation library)
-**Status:** Phase 1 complete, plus the cozy 2D redesign and the rigged puppet (no login, no backend)
+**Live app:** https://study-cat-pink.vercel.app (still the SVG puppet version from `main`)
+**Branch `game-cat`:** the cat and room now run in **Phaser** (a 2D game engine) as pixel art, not deployed yet
+**Stack:** React 19 + Vite 8 + Phaser 3.90
+**Status:** Phase 1 complete, cozy redesign, and now the game-engine cat (no login, no backend)
 
 ---
 
@@ -14,13 +15,16 @@ Everything built so far, in order, with simple explanations of what each piece d
 |---|---|
 | Pomodoro timer | Default 50 min study / 10 min break, both adjustable (study 1–180, break 1–60). Start, Pause, Reset, Skip. |
 | Auto phases | When study ends, the break starts by itself. When the break ends, the app waits for you to press Start. |
-| Puppet cat | A 2D cat in a 3/4 side view, built like a puppet: head, torso, 3-part tail, and legs with real joints. It's always alive: it breathes, blinks, twitches its ears and swishes its tail. |
-| Cozy room | Wooden floor, rug, a desk with a warm lamp, an open book, a pencil and a steaming mug, a stool, a plant, a framed paw print, and a window with leaves slowly falling outside. |
+| Pixel cat | An orange tabby from a sprite pack (3D-rendered into 64 × 64 pixel art), shown 3× or 4× with crisp pixels. A **state machine** (the cat brain) decides what it does, and only uses the transition chains from the pack, so it never snaps between poses. It walks to a spot before using it and turns around before changing direction. |
+| Cozy room | Pixel art: wooden floor, rug, a low desk with a cushion, a warm lamp and a steaming mug, a food bowl, a yarn ball, a little bath tub, a plant, a framed paw print, and a window with leaves falling from an autumn tree. On phones the camera follows the cat. |
 | Mood lighting | **Study:** the room dims slightly, the lamp glows warmer, and it turns to dusk outside. **Break:** the room brightens and it's sunny. |
 | Focus view | While studying: fullscreen, and everything hidden except the cat, the room and the time. |
-| Study actions | The cat hops onto the stool and switches every 15–25 s between: **reading** (head follows the lines), **turning a page** (the paw grabs the corner and the page flips), **writing** with a pencil, **sipping** from the mug with both paws, **chin on paw → yawn → stretch**, and **watching** you (turns toward your mouse). |
-| Break mode | The cat hops down to the rug and says *"Enough studying, play with me!"*. **Play 🧶** = bats the yarn with its front paws, **Feed 🐟** = eats from a bowl with its tail swishing, **Bathe 🫧** = sits in a little tub and shakes off bubbles. |
-| Sad cat | Switch tabs during study and the cat hunches on the stool: ears back, tail wrapped around its feet, sad brows, a tear. When you come back it complains, then forgives you after 4 s. |
+| Study | The cat walks to the desk, sits down, puts its glasses on and reads, turning a page every 20–40 s. |
+| No timer running | It wanders around the room, sits for a while, sometimes looks at you, and sometimes curls up for a nap. |
+| Click the cat | It turns to face you, meows (and says a line), then turns back and carries on. |
+| Break mode | The cat closes the book, stands up, walks to the rug, sits and looks at you. Then **Play 🧶** (bats the yarn), **Feed 🐟** (walks to the bowl and eats) and **Bathe 🫧** (hops into the tub, bubbles, a shake, hops out) unlock. |
+| Sad cat | Switch tabs during study and the cat closes its book and is sad (ears down, a tear). When you come back it complains, then goes back to reading after 4 s. |
+| Debug mode | Add `?debug` to the address: a panel with a button for every animation and every brain state, plus slow motion. |
 | Voice | The cat speaks short lines using the browser's built-in speech (Web Speech API). Mute button 🔊 in the top bar. |
 | Saved minutes | Today's study minutes are shown at the top and saved in `localStorage`, so they survive a reload. |
 | Saved settings | Your study/break lengths and mute choice are saved too. |
@@ -128,6 +132,43 @@ The one-shape cat couldn't *do* things, so it was rebuilt like a paper puppet.
 - **Try it yourself:** while `npm run dev` is running, open the browser console and type `studyCat.play('pageTurn')`, or any action or pose name from `poses.js`.
 - `App.jsx`, `hooks/` and `components/` are unchanged. The old name `eating` still works: it now plays `sipping`.
 
+### Step 13 — Pixel cat in Phaser + a cat brain · branch `game-cat`
+Files: `src/game/*`, `public/game/cat/*`, `tools/cat-generator/*`, `src/App.jsx`, `src/App.css`
+```bash
+git switch -c game-cat          # a new branch, so main stays safe
+npm install phaser@3.90.0
+```
+- **Branch:** all of this lives on `game-cat`. `main` still has the SVG puppet, which is the deployed version. `git switch main` and `git switch game-cat` jump between them.
+- **The sprite pack:** it came already unzipped as `study-cat-3d/` (there was no `.zip` file to delete).
+  - `study-cat.png` (a sprite sheet: 22 animations, each frame 64 × 64 px) and `study-cat.json` (where each animation starts, how many frames, fps, loop) → `public/game/cat/`, so the game can load them.
+  - The Python generator, previews and README → `tools/cat-generator/`. Nothing in `tools/` is deployed. Its `out/` folder is git-ignored.
+- **Phaser** is a 2D game engine: it draws to a `<canvas>` many times a second, plays sprite animations, moves things (tweens), and handles clicks on sprites. `pixelArt: true` turns off smoothing, so pixels stay square when zoomed.
+- **Measuring the sprites:** before placing anything, I measured the frames. The book in the reading frames lies 10 px above the cat's feet and reaches 27 px to its right, so the low desk's top is exactly there. The bowl (in `eat`) and the yarn (in `play`) are drawn inside the sprite, so the room's own bowl and yarn hide while those play.
+- **Pixel-art room (`roomArt.js`):** drawn from rectangles, triangles and circles at 1 px = 1 game pixel, then baked into a texture. The camera zooms it with **whole numbers only** (2×, 3× or 4×), so every pixel stays a sharp square. Wall and floor continue past the room's edges, so wide screens don't show empty space.
+- **Camera (`RoomScene.js`):** it picks the zoom so the floor sits just above the timer panel (React measures the panel and tells the game). If the room is wider than the screen (phones), the camera follows the cat.
+- **The cat brain (`catBrain.js`):** a state machine.
+  - **Goal**, from the timer: `wander`, `study`, `sad` or `break`. **Task**, from the buttons: `feed`, `play` or `bathe`.
+  - Each goal is a short script, like *walk to the desk → sit → open the book → read, turn a page now and then*.
+  - Scripts can only use three moves: `once(anim)` (play to the last frame), `hold(loop, seconds)` (always stops at the end of a loop) and `walkTo(x)` (whole strides only, turning around first if needed).
+- **Postures (`catAnims.js`):** the pack's README says every animation starts and ends in a pose. Those poses are written down as **postures**: stand, sit, front, read, sleep.
+  - A tiny route-finder (`path()`) gets from any posture to any other using only the allowed chains. For example, read → stand = `read_end, stand_up`.
+  - If anything ever tried to start from the wrong posture, it's counted as a **chain break**. The debug panel shows the count, and it stayed at 0 in testing.
+- **Never snapping:** when the goal changes (e.g. the break starts), the current move finishes first, then the new script plans from wherever the cat is.
+- **Turning left:** as the README says, play `turn_around`, then set `flipX`. Both happen in the same instant the animation ends, so there's no frame of the wrong direction.
+- **Bathe** has no animation in the pack, so it's built from pieces: walk to the tub → `jump` in (the sprite is moved along an arc during the leap frames) → `sit_down` → bubbles and a little shake → `stand_up` → `jump` out. Once in the tub it always finishes, so the cat can't get stuck in the water.
+- **React still owns the app:**
+  - `useTimer`, the stats and the voice are unchanged.
+  - `App.jsx` now only tells the game *what* the cat should be doing (`goal`, `mood`) and passes the break buttons through as commands.
+  - The game tells React when the cat is busy (so the buttons wait) and when it meows (so the voice speaks).
+  - The game also writes the cat's head position into CSS variables, so the speech bubble follows it around the room.
+- **Phaser loads lazily:** it's about 1.2 MB, so it's in its own file (`import()`), loaded after the page shows.
+- **Debug mode (`?debug`, `DebugPanel.jsx`):** shows the goal, animation, posture, facing and chain-break count. It has buttons for every state (wander, study, sad, break, nap, feed, play, bathe, click) and every raw animation. A raw animation pauses the brain and may snap on purpose; "follow the timer" hands control back. Speed: 1×, 0.5×, 0.25×, 0.1×.
+- **Bugs found while testing and fixed:**
+  - If study started while the cat was asleep and already facing the desk, it began walking straight out of the sleep pose. Now `walkTo` always stands up first.
+  - A raw debug animation that never finished could fire its "done" handler later on a real animation. Now it's cleared.
+  - Phaser missed some window resizes. Now the canvas watches its own size.
+- The old SVG puppet files (`src/cat/`, `src/scene/`) were removed on this branch. They're safe on `main` and in git history.
+
 ---
 
 ## 3. Project structure
@@ -136,34 +177,26 @@ The one-shape cat couldn't *do* things, so it was rebuilt like a paper puppet.
 study-cat/
 ├─ index.html               page shell, title, favicon link
 ├─ package.json             dependencies + scripts (dev, build, lint, preview)
-├─ public/favicon.svg       🐱 tab icon
-├─ .claude/launch.json      dev-server config for Claude's browser preview
+├─ public/
+│  ├─ favicon.svg           🐱 tab icon
+│  └─ game/cat/             the sprite sheet + its JSON (loaded by the game)
+├─ tools/cat-generator/     the pack's Python generator, previews, README (not deployed)
 └─ src/
    ├─ main.jsx              starts React, loads the fonts
-   ├─ App.jsx               the screen: timer + cat + break panel + sad/voice logic
-   ├─ App.css               layout variables, panel, bubble, focus view
+   ├─ App.jsx               the screen: timer, panel, voice; tells the cat its goal
+   ├─ App.css               panel, speech bubble (follows the cat), focus view
    ├─ index.css             palette + hand-drawn buttons and inputs
-   ├─ hooks/
-   │  ├─ useTimer.js         study/break countdown
-   │  ├─ useStudyStats.js    today's minutes (localStorage)
-   │  ├─ useCatVoice.js      speech bubble + Web Speech API + mute
-   │  └─ useLocalStorage.js  useState that survives reloads
-   ├─ components/
-   │  ├─ Settings.jsx        study/break length inputs
-   │  └─ BreakPanel.jsx      Play / Feed / Bathe buttons + their lines
-   ├─ cat/
-   │  ├─ catConfig.js        the list of animation names (the "contract")
-   │  ├─ poses.js            ★ rig sizes, every pose, every action — edit here
-   │  ├─ rig.js              the math: inverse kinematics, blending, easing
-   │  ├─ usePuppet.js        the animator loop + idle life (breathe/blink/…)
-   │  ├─ Cat.jsx             the puppet drawing: one <g> per jointed part
-   │  ├─ cat.css             fur, outlines, eye/mouth expressions
-   │  ├─ CatScene.jsx        room + the stage (desk, stool, props, cat)
-   │  ├─ stage.css           stage paints, lamp glow, study/break lighting
-   │  └─ useStudyCycle.js    rotates the study actions
-   └─ scene/
-      ├─ Room.jsx            wall, window with falling leaves, plant, floor
-      └─ room.css            room layout + study/break dimming
+   ├─ hooks/                useTimer, useStudyStats, useCatVoice, useLocalStorage
+   ├─ components/           Settings, BreakPanel
+   └─ game/
+      ├─ GameCanvas.jsx     React ↔ Phaser bridge (loads Phaser lazily)
+      ├─ RoomScene.js       the Phaser scene: room, cat, camera, lighting, leaves
+      ├─ catBrain.js        ★ the cat's state machine (goals, tasks, scripts)
+      ├─ catAnims.js        each animation's start/end posture + chain route-finder
+      ├─ layout.js          every spot and prop position (game pixels)
+      ├─ roomArt.js         the pixel-art drawing of the room and props
+      ├─ DebugPanel.jsx     the ?debug panel
+      └─ debug.css
 ```
 
 ### Palette
@@ -198,21 +231,28 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `git log --oneline` | Shows the commit history |
 | `git status` | Shows what changed since the last commit |
 | `npx vercel deploy --prod` | Publishes the current code to the live URL |
+| `git switch main` / `git switch game-cat` | Jump between the deployed version and the Phaser version |
+| open `http://localhost:5173/?debug` | The cat debug panel |
 
 ---
 
 ## 5. How it was tested
 
-Puppet checked in the browser at 1280×800, 800×600 and phone (375×812) sizes:
-- ✅ Every study pose inspected up close: reading, page reach / flip / land, pencil pick-up, writing, thinking (pencil to chin), mug reach + sip with both paws, chin rest, yawn, stretch, watching (mouse on both sides)
-- ✅ Every break pose: sitting on the rug, batting the yarn, eating from the bowl (with hearts), bathing in the tub
-- ✅ Sad: hunched on the stool, ears back, tear, tail wrapped in front of the feet (via the real tab-switch logic, event simulated)
-- ✅ Hop between stool and rug when study starts and when the break starts (real Start / Skip buttons)
-- ✅ All 12 names in `catConfig.js` resolve to actions; all 22 poses give valid angles
-- ✅ Speech bubble follows the cat's head on the stool and on the rug
-- ✅ Phone: break panel fits under the cat (buttons stay on one row)
-- ✅ No console errors; lint and build clean; `App.jsx`, `hooks/` and `components/` unchanged
-- ⚠️ The spoken voice wasn't listened to (muted during testing). Try it yourself; voices differ by browser.
+**Phaser cat (branch `game-cat`)**, run in the browser at 1280×800 and phone size (375×812), with an automatic recorder that logged every animation, where the cat was, and which way it faced:
+- ✅ **Chain breaks: 0** across every test below, so no animation ever started from the wrong pose.
+- ✅ **Wander:** every change of direction was `idle → turn_around → idle → walk`; the cat never slid while not walking; it always faced the way it walked; it sat, looked at you, slept and woke up.
+- ✅ **Study (real Start button):** walk → turn → `sit_down → read_start → read`, even starting from sleep (`wake_up → stand_up → …`). A `page_turn` fired on its own and went back to `read`. The book lines up with the desk top.
+- ✅ **Sad (tab switch, simulated):** `read_end → sad`, the "come back" line, then `read_start → read` after 4 s.
+- ✅ **Click the cat (a real mouse click):** while reading, `read_end → turn_front → meow → turn_back → read_start → read`, and the bubble said "Meow meow!". While asleep it woke up first, then went back to sleep.
+- ✅ **Break (real Skip button):** `read_end → stand_up → turn → walk → turn → sit_down → look_at_you`. Play/Feed/Bathe stayed disabled until the look, then enabled.
+- ✅ **Feed:** walked to the bowl, faced it, ate (the room's bowl hid), went back to the rug. **Play:** batted the yarn. **Bathe:** jumped in, bubbles, shake, jumped out.
+- ✅ **Pause during break** → wander; **Start again** → back to the rug.
+- ✅ **Debug panel:** raw animations pause the brain, "follow the timer" resumes it, and slow motion slows animations, tweens and timers together. Without `?debug` the panel isn't there.
+- ✅ **Phone:** 3× zoom, the camera follows the cat, and its feet stay above the panel.
+- ✅ Lint and build clean. Phaser is in its own lazy-loaded file, and `tools/` isn't in the build.
+- ⚠️ Not deployed yet (on purpose). The voice still wasn't listened to (muted during tests).
+
+**Earlier SVG puppet (on `main`)** was checked at 1280×800, 800×600 and 375×812: every pose, the hops, sad, the bubble, and the phone layout.
 
 ---
 
@@ -222,26 +262,30 @@ Puppet checked in the browser at 1280×800, 800×600 and phone (375×812) sizes:
 - Clearing browser data erases your minutes.
 - Speech voices vary by browser/OS, and some browsers need a click before audio plays.
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
-- The cat only follows the mouse, not touch (on phones it just looks ahead).
-- On narrow phones the edges of the stage are cropped (the far end of the desk, the book stack).
-- Movements are hand-tuned poses, so some hand-offs (like grabbing the pencil) are a quick fade rather than a true grip.
+- The sprite pack has no bath animation, so **Bathe** is assembled from jump, sit and a shake.
+- A change of plan waits for the current move to finish (up to about 2 s for a long loop like `read`), on purpose, so the cat never snaps.
+- Phaser adds about 320 kB (gzipped) to download. It loads after the page, but the very first visit shows an empty room for a moment.
+- If the browser tab is in the background, the game pauses (browsers stop drawing hidden pages). The timer keeps counting correctly.
 
 ---
 
-## 7. Adding a new action (example: "wave")
+## 7. Teaching the cat something new (Phaser version)
 
-1. In `src/cat/poses.js`, add a pose (copy a similar one and change a few numbers):
+Example: "when the break starts, sometimes nap on the rug instead".
+1. Behaviours live in `src/game/catBrain.js`, in `scripts`. Each one is an `async` function using `walkTo`, `toPosture`, `once` and `hold`:
    ```js
-   wave: { ...readStill, head: -6, armN: { reach: [400, 170], paw: -80 }, eyes: 'happy' },
+   async lazyBreak(v) {
+     await this.goTo(SPOTS.rug, 'right', v)
+     if (this.stale(v)) return
+     await this.toPosture('sleep', v)   // sit_down, sleep_down: chosen for you
+     await this.hold('sleep', Infinity, v)
+   },
    ```
-2. Add the action (a list of steps):
-   ```js
-   waving: { steps: [{ pose: 'wave', dur: 0.4, hold: 0.3 }, { pose: 'readStill', dur: 0.4 }] },
-   ```
-3. Try it: `studyCat.play('waving')` in the browser console (dev server only).
-4. To use it in the app, add `'waving'` to `CAT_ANIMATIONS` (and to `STUDY_IDLES` if it's a study action).
+2. `if (this.stale(v)) return` after each step lets the cat drop the plan when the timer changes its goal.
+3. Try it with `?debug` and `window.catScene.brain.setGoal('lazyBreak')` in the console.
+4. A new place in the room goes in `layout.js` (`SPOTS`); a new prop goes in `roomArt.js`.
 
-Tips: angles are degrees, `0` = hanging straight down, negative = forward. Use `reach` / `foot` targets in stage coordinates (800 × 520) when a paw needs to touch something.
+If a new sprite animation is added to the pack, add one line to `ANIMS` in `catAnims.js` saying which posture it starts and ends in. The route-finder then knows how to reach it.
 
 ---
 
@@ -251,5 +295,6 @@ Tips: angles are degrees, `0` = hanging straight down, negative = forward. Use `
 - History chart and study streaks (the per-day data is already being saved)
 - Sounds (purring, meows, rain on the window) and a "session complete" notification
 - Day/night room that follows your real clock
-- More actions (stretching on the rug, napping on the desk, chasing a falling leaf)
+- More behaviours for the Phaser cat (chasing a falling leaf, napping in a sunbeam)
+- Deploy the `game-cat` branch once it's been checked locally
 - Unlockable room decorations as study rewards
