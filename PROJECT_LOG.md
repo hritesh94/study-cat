@@ -3,9 +3,10 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app (the HD cat with the "My Cat" wardrobe, merged into `main` and deployed)
-**Code:** https://github.com/hritesh94/study-cat (public; branches `main` and `game-cat`)
-**Stack:** React 19 + Vite 8 + Phaser 3.90
-**Status:** Phase 1 complete, cozy redesign, and now the game-engine cat (no login, no backend)
+**Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`)
+**Branch `phase-2`:** accounts, coins and streaks with Supabase. Not merged or deployed yet.
+**Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
+**Status:** Phase 1 complete; Phase 2 (accounts) in progress on `phase-2`
 
 ---
 
@@ -28,6 +29,7 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
 | Voice | The cat speaks short lines using the browser's built-in speech (Web Speech API). Mute button 🔊 in the top bar. |
 | Saved minutes | Today's study minutes are shown at the top and saved in `localStorage`, so they survive a reload. |
+| Accounts (phase-2) | **Log in** with an emailed magic link (no password). Logged in, you earn **coins** for studying and keep a **streak**, both shown in the top bar, with a "+N coins" pop when a session ends. Your cat look is saved to your account. Everything still works logged out. |
 | Saved settings | Your study/break lengths and mute choice are saved too. |
 
 ---
@@ -252,6 +254,39 @@ After that:
 
 (Alternative to steps 2–4, from this folder: `npx vercel git connect`. It links the project to the repo in `origin`, but GitHub still asks you to install the Vercel app the first time.)
 
+### Step 17 — Accounts, coins and streaks with Supabase · branch `phase-2`
+Files: `supabase/migrations/*.sql`, `tools/db-test.mjs`, `src/lib/supabase.js`, `src/hooks/useAuth.js`, `useProfile.js`, `useStudySessions.js`, `src/components/AccountPanel.jsx`, `CoinPop.jsx`, `CoinIcon.jsx`, `Sheet.css`, `src/App.jsx`
+- **Supabase** is a hosted Postgres database with logins built in. The browser talks to it directly with `@supabase/supabase-js`.
+- **Keys:** `.env.local` (ignored by Git, never committed) holds `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The same two are set in Vercel for Production, Preview and Development (`npx vercel env add …`, checked with `npx vercel env ls`).
+  - The *publishable* key is meant to be public: it ends up in everyone's browser.
+  - What keeps data safe is **Row Level Security** in the database. A *secret* key must never go in the app.
+  - `.env.example` lists the two names (no values) for anyone cloning the repo.
+- **Login:** an email **magic link** (`signInWithOtp`). Opening the link signs you in, and supabase-js reads the login from the address bar.
+  - The top bar shows **Log in**, or your name once you're logged in. The panel shows coins, streak, best streak and today's minutes, lets you rename yourself, and has Log out.
+  - Logged out, a gentle note under the timer says "Log in to save progress and earn coins."
+
+#### The database (paste these 3 files, in this order)
+In Supabase: **SQL Editor → New query**, paste the whole file, then **Run**. Repeat for the next file.
+1. `supabase/migrations/20261029000001_tables.sql`: `game_settings` (one row with every tunable number), `profiles`, `study_sessions`, `owned_items`.
+2. `supabase/migrations/20261029000002_security.sql`: Row Level Security on every table, plus grants. Users can read only their own rows, and can change only `display_name`, `breed` and `outfit`.
+3. `supabase/migrations/20261029000003_functions.sql`: the sign-up trigger (a profile is created automatically) and the functions `start_session`, `end_session`, `import_local_progress`.
+
+#### Anti-cheat: the server keeps the time and the coins
+- The browser can't write coins, streaks or sessions at all. They change only inside **security definer** functions (they run with the owner's rights), and those check `auth.uid()` so they touch only your own rows.
+- `start_session(planned_minutes)`: the **server** writes `started_at = now()`. Only one open session per user: a forgotten one (tab closed) is closed with nothing counted.
+- `end_session(session_id, local_day)`: counted minutes = real server time passed (with 10 s of slack for network delay), capped at `planned_minutes`.
+  - Coins = 1 per minute, +10 for a full session planned at **25+ minutes**, at most **300 per day**.
+  - The 25-minute rule for the bonus is an extra safety I added: otherwise 1-minute "full" sessions would earn 11 coins a minute.
+- **Which day:** the browser sends its own date ("2026-10-29") so late-night study counts for the right day where you live. It's trusted only within **1 day** of the server's UTC date (every time zone fits), and never earlier than a day you already used, so date tricks can't reset the daily cap.
+- **Streak:** a day counts once it reaches **25 minutes** in total. The next day continues the streak, and a missed day resets it. `best_streak` keeps the record. The top bar shows 0 once your last streak day is older than yesterday.
+- **Tuning:** every number above is one column in `game_settings`, e.g. `update public.game_settings set daily_coin_cap = 400;`
+- **Hooked to the timer** (`useStudySessions`): studying starts → `start_session`; study ends, Skip, Pause or Reset → `end_session`. Resuming after a pause starts a new session.
+  - The result updates the top bar, shows **"+N coins"** over the cat, and the cat turns to face you.
+- **First login** (`import_local_progress`, once per account): this browser's total study minutes are saved as `legacy_minutes` (history only, so editing localStorage can't earn coins), and your `studycat:cat` choice becomes your profile's look.
+
+#### Testing the database without touching the real one
+`npm run test:db` runs all three migrations in **PGlite** (real Postgres compiled to WebAssembly, inside Node), with a stand-in for Supabase's `auth` schema, roles and default "everyone can do everything" grants. Two pretend users, Ana and Ben, go through **44 checks**: each sees only their own data, coins, streak, sessions, items and settings can't be written directly, session times come from the server, the daily cap holds, fake dates are pulled back, streaks count and reset, and the import happens once.
+
 ---
 
 ## 3. Project structure
@@ -265,14 +300,21 @@ study-cat/
 │  └─ game/cat/             study-cat.json, breeds/, outfits/ (sheets) + thumbs/ (wardrobe pictures)
 ├─ tools/
 │  ├─ cat-generator-hd/     the HD pack's Python generator, previews, README (not deployed)
-│  └─ make-thumbs.mjs       cuts the wardrobe pictures out of the sheets (npm run thumbs)
+│  ├─ make-thumbs.mjs       cuts the wardrobe pictures out of the sheets (npm run thumbs)
+│  └─ db-test.mjs           tests the database migrations in PGlite (npm run test:db)
+├─ supabase/migrations/     the 3 SQL files to paste into Supabase, in order
+├─ .env.local               your Supabase URL + publishable key (NOT committed)
+├─ .env.example             the same names with no values (committed)
 └─ src/
    ├─ main.jsx              starts React, loads the fonts
    ├─ App.jsx               the screen: timer, panel, voice; tells the cat its goal
    ├─ App.css               panel, speech bubble (follows the cat), focus view
    ├─ index.css             palette + hand-drawn buttons and inputs
-   ├─ hooks/                useTimer, useStudyStats, useCatVoice, useLocalStorage
-   ├─ components/           Settings, BreakPanel, Wardrobe (the My Cat panel)
+   ├─ lib/supabase.js       the Supabase client, local day, live streak
+   ├─ hooks/                useTimer, useStudyStats, useCatVoice, useLocalStorage,
+   │                        useAuth, useProfile, useStudySessions
+   ├─ components/           Settings, BreakPanel, Wardrobe (My Cat), AccountPanel,
+   │                        CoinPop, CoinIcon, Sheet.css (shared bottom sheet)
    └─ game/
       ├─ GameCanvas.jsx     React ↔ Phaser bridge (loads Phaser lazily)
       ├─ RoomScene.js       the Phaser scene: room, cat + outfit, breeds, camera, lighting
@@ -316,6 +358,8 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run preview` | Serves the built `dist/` locally, to check the release version |
 | `npm run lint` | Checks the code for common mistakes (oxlint) |
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
+| `npm run test:db` | Tests the Supabase migrations locally (two pretend users, 44 checks) |
+| `npx vercel env ls` | Lists the environment variables on Vercel |
 | `git log --oneline` | Shows the commit history |
 | `git status` | Shows what changed since the last commit |
 | `git push` | Sends your commits to GitHub (once Vercel is connected, a push to `main` also deploys) |
@@ -326,6 +370,25 @@ To reset everything, open the browser console on the site and run `localStorage.
 ---
 
 ## 5. How it was tested
+
+**Accounts (step 17)**
+- ✅ `npm run test:db`: 44/44 database checks with two simulated users (listed in step 17).
+- ✅ Logged out, in the browser: the app works as before; "Log in" is in the top bar with the note under the timer; the panel opens and closes (×, Escape), focus moves in and back, an invalid email is refused, and the timer panel steps aside while a sheet is open.
+- ✅ The real Supabase project answers (before the migrations: "table not found", as expected).
+- ✅ Phone: the logged-in top bar (coins, streak, 👤) fits on one line (checked with sample values).
+- ✅ The "+N coins" pop shows over the cat's head, and the cat faces you (checked with sample markup).
+- ✅ Vercel has both variables for Production, Preview and Development, matching `.env.local` exactly.
+- ⏳ **Not tested by Claude:** logging in with real accounts. A magic link arrives by email, so that needs your inboxes. See "Testing with two accounts" below.
+
+#### Testing with two accounts (do this after pasting the 3 SQL files)
+Use two browsers (or a normal and a private window), one account each, with 1-minute study sessions. While testing, in the SQL Editor, `update public.game_settings set daily_coin_cap = 5;` makes the cap easy to hit. Afterwards set it back with `update public.game_settings set daily_coin_cap = 300;`.
+1. Log in as A. The profile shows your email name, 0 coins and 0 streak, and your local cat look carries over.
+2. Set study to 1 minute and let it finish → "+1 coin" (no bonus under 25 min).
+3. In the dev console: `await supabase.from('profiles').update({ coins: 9999 }).eq('id', (await supabase.auth.getUser()).data.user.id)` → an error (permission denied), and coins don't change.
+4. `await supabase.from('profiles').select('*')` → only A's own row. `await supabase.from('study_sessions').select('*')` → only A's sessions.
+5. Repeat 1-minute sessions until the cap (5) → "Today's coins are all collected".
+6. Log in as B in the other browser: B sees only B's data and starts at 0 coins.
+7. Start a session, wait 30 s, press Pause → 0 coins (less than a minute counted).
 
 **My Cat wardrobe (step 15)**, at 1280×800 and phone size (375×812):
 - ✅ The real **🐱 My Cat** button opens it; × and Escape close it. Focus moves into the panel and back to the button.
@@ -368,7 +431,10 @@ To reset everything, open the browser console on the site and run `localStorage.
 
 ## 6. Known limitations
 
-- Minutes are stored **per browser**: your friend's minutes and yours aren't shared or synced.
+- Minutes are stored **per browser**: your friend's minutes and yours aren't shared or synced. (With an account, coins and streaks *are* saved online; "Today: N min" still counts this browser.)
+- Supabase's built-in email sender only allows a few emails per hour. For real use, set up your own email provider (SMTP) in Supabase.
+- If the tab is closed in the middle of a session, that session earns nothing (the server closes it with 0 the next time you start).
+- A trickster can still move their "today" up to 1 day ahead, but that only uses up tomorrow's cap early. It can't add coins beyond the real minutes studied.
 - Clearing browser data erases your minutes.
 - Speech voices vary by browser/OS, and some browsers need a click before audio plays.
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
@@ -408,8 +474,7 @@ If a new sprite animation is added to the pack, add one line to `ANIMS` in `catA
 
 ## 8. Ideas for Phase 2
 
-- Login + backend so minutes sync across devices
-- A shop with coins earned by studying, to buy breeds and outfits (Supabase): fill in the `lock`s in `catItems.js` and pass real `progress` to the wardrobe
+- A shop: spend coins on breeds and outfits. Fill in the `lock`s in `catItems.js`, pass real `progress` (coins, streak, `owned_items`) to the wardrobe, and add a `buy_item` function on the server that checks the price
 - History chart and study streaks (the per-day data is already being saved)
 - Sounds (purring, meows, rain on the window) and a "session complete" notification
 - Day/night room that follows your real clock
