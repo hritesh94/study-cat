@@ -14,16 +14,16 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 //
 // Phaser is big, so it's loaded only when this component mounts
 // (`import()` makes Vite put it in its own file).
-export function GameCanvas({ ref, goal, mood, look, onLookChange, coverRefs, onBusy, onMeow }) {
+export function GameCanvas({ ref, goal, mood, look, progress, onLookChange, coverRefs, onBusy, onMeow }) {
   const hostRef = useRef(null)
   const sceneRef = useRef(null)
   const bridge = useRef({})
-  const latest = useRef({ goal, mood, look })
+  const latest = useRef({ goal, mood, look, progress })
   const debugOverride = useRef(false)
 
   // keep callbacks fresh without restarting the game
   useEffect(() => {
-    latest.current = { goal, mood, look }
+    latest.current = { goal, mood, look, progress }
     Object.assign(bridge.current, { onBusy, onMeow })
   })
 
@@ -59,6 +59,7 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, coverRefs, onB
         scene.brain.setGoal(latest.current.goal)
         scene.setMood(latest.current.mood)
         scene.setLook(latest.current.look)
+        scene.setProgress(latest.current.progress)
         measure()
       },
       onCatScreen: (x, y) => {
@@ -129,6 +130,9 @@ export function GameCanvas({ ref, goal, mood, look, onLookChange, coverRefs, onB
   useEffect(() => {
     sceneRef.current?.setLook(look)
   }, [look])
+  useEffect(() => {
+    sceneRef.current?.setProgress(progress)
+  }, [progress])
 
   return (
     <>

@@ -360,7 +360,7 @@ button.icon {
   }
 }
 
-/* ── 📖 book mode: only on phones and tablets ── */
+/* ── 📖 book mode: only on phones and tablets (touch screens) ── */
 button.book-toggle {
   display: none;
   align-self: center;
@@ -373,7 +373,7 @@ button.book-toggle.on {
   background: var(--sage-light);
   box-shadow: inset 0 0 0 2px var(--sage);
 }
-@media (max-width: 768px), (pointer: coarse) {
+@media (pointer: coarse) {
   button.book-toggle {
     display: inline-flex;
     gap: 0.35rem;

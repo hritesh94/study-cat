@@ -3,6 +3,7 @@ import { CatBrain } from './catBrain'
 import { animKey, baseName } from './catAnims'
 import { BOWL_POS, C, drawProps, drawRoom, RES, ROOM_TEX, YARN_POS } from './roomArt'
 import { CAT_SCALE, FEET_Y, HEAD_TOP, LAMP, MUG, ROOM_W, SPOTS, VIEW_BOTTOM } from './layout'
+import { RoomProgressLayer } from './RoomProgressLayer'
 
 const DEPTH = { room: 0, leaves: 1, props: 2, light: 8, glow: 9, cat: 10, ghost: 12, front: 20 }
 const BASE = 'game/cat/'
@@ -57,6 +58,9 @@ export class RoomScene extends Phaser.Scene {
     }
     art(SPOTS.tub, FEET_Y - 3, 'tubBack').setDepth(DEPTH.props)
     this.tubFront = art(SPOTS.tub, FEET_Y - 2, 'tubFront').setOrigin(0.5, 0).setDepth(DEPTH.props)
+
+    // bookshelf, coin jar and plant (see roomProgress.js)
+    this.progress = new RoomProgressLayer(this, DEPTH.props)
 
     this.makeWindowLife()
     this.makeSteam()
@@ -286,6 +290,11 @@ export class RoomScene extends Phaser.Scene {
   }
 
   // 'focus' (studying) dims the room and warms the lamp; 'break' brightens it.
+  // how you're doing: { subjects, todayCoins, dailyCap, streak, broken }
+  setProgress(data) {
+    if (data) this.progress?.set(data)
+  }
+
   setMood(mood) {
     const to = {
       focus: { dim: 0.28, bright: 0, glow: 0.85, dusk: 0.35 },

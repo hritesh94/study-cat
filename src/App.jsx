@@ -21,6 +21,7 @@ import { useLocalStorage } from './hooks/useLocalStorage'
 import { useProfile } from './hooks/useProfile'
 import { useStudySessions } from './hooks/useStudySessions'
 import { useStudyStats } from './hooks/useStudyStats'
+import { useSubjectTotals } from './hooks/useSubjectTotals'
 import { useSubjects } from './hooks/useSubjects'
 import { useWakeLock } from './hooks/useWakeLock'
 import { formatTime, useTimer } from './hooks/useTimer'
@@ -87,6 +88,17 @@ export default function App() {
   const localStreaks = useMemo(
     () => streaksFrom(Object.fromEntries(Object.entries(byDay).map(([d, ms]) => [d, Math.floor(ms / 60000)])), streakMinutes),
     [byDay, streakMinutes],
+  )
+
+  // ── The room shows your progress (bookshelf, coin jar, plant) ──
+  const subjectTotals = useSubjectTotals({ userId: profile?.id ?? null, version: statsVersion, local: localStats })
+  const shownStreak = profile ? streak : localStreaks.current
+  const shownBest = profile ? profile.best_streak : localStreaks.best
+  const todayCoins = serverToday.days[today]?.coins ?? 0
+  const dailyCap = profile ? (gameRules?.daily_coin_cap ?? 300) : 0
+  const roomProgress = useMemo(
+    () => ({ subjects: subjectTotals, todayCoins, dailyCap, streak: shownStreak, broken: shownStreak === 0 && shownBest > 0 }),
+    [subjectTotals, todayCoins, dailyCap, shownStreak, shownBest],
   )
 
   const sessionMs = useRef(0) // study time in this session (for the summary card)
@@ -337,6 +349,7 @@ export default function App() {
         goal={catGoal}
         mood={mood}
         look={catLook}
+        progress={roomProgress}
         onLookChange={setCatLook}
         coverRefs={coverRefs}
         onBusy={setCatBusy}
@@ -438,8 +451,8 @@ export default function App() {
         onClose={closeSheet}
         userId={profile?.id ?? null}
         local={localStats}
-        streak={profile ? streak : localStreaks.current}
-        bestStreak={profile ? profile.best_streak : localStreaks.best}
+        streak={shownStreak}
+        bestStreak={shownBest}
         streakMinutes={streakMinutes}
         version={statsVersion}
       />
