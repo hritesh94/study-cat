@@ -1,6 +1,7 @@
-// Draws the room as pixel art: plain rectangles, triangles and circles drawn
-// at 1:1, then baked into textures. The camera zooms them up with
-// `pixelArt: true`, so every game pixel becomes a crisp square.
+// Draws the room from plain rectangles, triangles and circles, baked into
+// textures. Everything is drawn at RES texture pixels per game pixel, so it
+// stays sharp and smooth (antialiased) when the camera zooms in — matching
+// the smooth HD cat. Coordinates below are still in game pixels.
 import { DESK, FEET_Y, LAMP, MUG, PROP_DX, SPOTS } from './layout'
 
 export const C = {
@@ -30,10 +31,16 @@ export const C = {
   kibble: 0xb5774c,
 }
 
+// Texture pixels per game pixel. The camera never zooms past 3×, so at
+// most zoom one texture pixel = one screen pixel.
+export const RES = 3
+
 // A tiny drawing kit on top of Phaser Graphics, offset so negative
-// coordinates (the wall/floor beyond the room's edges) fit in the texture.
+// coordinates (the wall/floor beyond the room's edges) fit in the texture,
+// and scaled up by RES.
 function kit(g, ox, oy) {
-  const rect = (x, y, w, h, color) => g.fillStyle(color).fillRect(x + ox, y + oy, w, h)
+  const R = RES
+  const rect = (x, y, w, h, color) => g.fillStyle(color).fillRect((x + ox) * R, (y + oy) * R, w * R, h * R)
   return {
     rect,
     // a box with a 1 px ink outline
@@ -41,14 +48,18 @@ function kit(g, ox, oy) {
       rect(x, y, w, h, C.ink)
       rect(x + 1, y + 1, w - 2, h - 2, color)
     },
-    tri: (x1, y1, x2, y2, x3, y3, color) => g.fillStyle(color).fillTriangle(x1 + ox, y1 + oy, x2 + ox, y2 + oy, x3 + ox, y3 + oy),
-    circle: (x, y, r, color) => g.fillStyle(color).fillCircle(x + ox, y + oy, r),
-    ellipse: (x, y, w, h, color) => g.fillStyle(color).fillEllipse(x + ox, y + oy, w, h),
+    tri: (x1, y1, x2, y2, x3, y3, color) =>
+      g.fillStyle(color).fillTriangle((x1 + ox) * R, (y1 + oy) * R, (x2 + ox) * R, (y2 + oy) * R, (x3 + ox) * R, (y3 + oy) * R),
+    circle: (x, y, r, color) => g.fillStyle(color).fillCircle((x + ox) * R, (y + oy) * R, r * R),
+    ellipse: (x, y, w, h, color) => g.fillStyle(color).fillEllipse((x + ox) * R, (y + oy) * R, w * R, h * R),
   }
 }
 
-// The whole room background, as one texture covering x −400…720, y −200…280.
-export const ROOM_TEX = { x: -400, y: -200, w: 1120, h: 480 }
+// The whole room background, as one texture covering x −280…600, y −120…320
+// (wall and floor carry on past the room for wide screens, and the floor
+// runs on below, for when an open panel lifts the room). In texture pixels
+// that's 2640 × 1320, safely under the 4096 limit of most GPUs.
+export const ROOM_TEX = { x: -280, y: -120, w: 880, h: 440 }
 
 export function drawRoom(g) {
   const { rect, box, tri, circle, ellipse } = kit(g, -ROOM_TEX.x, -ROOM_TEX.y)
@@ -56,9 +67,9 @@ export function drawRoom(g) {
   const W = ROOM_TEX.w
 
   // wall + wallpaper (faint stripes and dots)
-  rect(L, -200, W, 298, C.wall)
-  for (let x = L; x < L + W; x += 10) rect(x, -200, 1, 296, C.wallLine)
-  for (let y = -196; y < 92; y += 12) for (let x = L + ((y / 12) % 2 ? 5 : 0); x < L + W; x += 20) rect(x + 2, y, 1, 1, C.wallDot)
+  rect(L, ROOM_TEX.y, W, 98 - ROOM_TEX.y, C.wall)
+  for (let x = L; x < L + W; x += 10) rect(x, ROOM_TEX.y, 1, 96 - ROOM_TEX.y, C.wallLine)
+  for (let y = ROOM_TEX.y + 4; y < 92; y += 12) for (let x = L + ((y / 12) % 2 ? 5 : 0); x < L + W; x += 20) rect(x + 2, y, 1, 1, C.wallDot)
 
   // wainscot, baseboard
   rect(L, 96, W, 1, C.sageDark)
@@ -69,11 +80,11 @@ export function drawRoom(g) {
   rect(L, 122, W, 1, C.inkSoft)
 
   // wooden floor: plank rows get taller toward you, which fakes depth
-  rect(L, 123, W, 160, C.floor)
-  const rows = [123, 129, 136, 144, 153, 163, 175, 189, 205, 224, 246, 270]
+  rect(L, 123, W, 200, C.floor)
+  const rows = [123, 129, 136, 144, 153, 163, 175, 189, 205, 224, 246, 270, 296]
   rows.forEach((y, i) => {
     if (i > 0) rect(L, y, W, 1, C.floorLine)
-    const next = rows[i + 1] ?? 282
+    const next = rows[i + 1] ?? 322
     for (let x = L + ((i * 17) % 48); x < L + W; x += 48) rect(x, y, 1, next - y, C.floorLine)
   })
 
@@ -151,12 +162,13 @@ export function drawRoom(g) {
   rect(LAMP.x - 4, LAMP.glowY - 2, 8, 2, 0xfff1c4)
 }
 
-// Small props that change during the day get their own textures.
+// Small props that change during the day get their own textures
+// (also drawn at RES; show them with .setScale(1 / RES)).
 export function drawProps(scene) {
   const make = (key, w, h, draw) => {
     const g = scene.make.graphics({}, false)
     draw(kit(g, 0, 0))
-    g.generateTexture(key, w, h)
+    g.generateTexture(key, w * RES, h * RES)
     g.destroy()
   }
   // an empty food bowl (hidden while the eat animation shows its own bowl)
@@ -206,6 +218,8 @@ export function drawProps(scene) {
   glow.refresh()
 }
 
-// where the room's own bowl / yarn sit, so they line up with the sprite's
-export const BOWL_POS = { x: SPOTS.bowl + PROP_DX, y: FEET_Y + 3 }
-export const YARN_POS = { x: SPOTS.play + PROP_DX, y: FEET_Y + 2 }
+// where the room's own bowl / yarn sit (bottom edge), lined up with the ones
+// drawn inside the eat / play frames: HD frame rows 104–114 and 100–117,
+// i.e. down to 5 and 6 game px below the feet
+export const BOWL_POS = { x: SPOTS.bowl + PROP_DX, y: FEET_Y + 5 }
+export const YARN_POS = { x: SPOTS.play + PROP_DX, y: FEET_Y + 6 }

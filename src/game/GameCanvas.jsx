@@ -6,23 +6,24 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 // The bridge between React and the Phaser game.
 //
 //  React → game:  `goal` (wander / study / sad / break), `mood` (lighting),
-//                 and ref.current.command('feed' | 'play' | 'bathe')
+//                 `look` ({ breed, outfit }), and
+//                 ref.current.command('feed' | 'play' | 'bathe')
 //  game → React:  onBusy (the cat is busy, so the break buttons are disabled),
 //                 onMeow (the cat was clicked and meows), and the cat's head
 //                 position, written as CSS variables for the speech bubble.
 //
 // Phaser is big, so it's loaded only when this component mounts
 // (`import()` makes Vite put it in its own file).
-export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
+export function GameCanvas({ ref, goal, mood, look, onLookChange, panelRef, sheetRef, onBusy, onMeow }) {
   const hostRef = useRef(null)
   const sceneRef = useRef(null)
   const bridge = useRef({})
-  const latest = useRef({ goal, mood })
+  const latest = useRef({ goal, mood, look })
   const debugOverride = useRef(false)
 
   // keep callbacks fresh without restarting the game
   useEffect(() => {
-    latest.current = { goal, mood }
+    latest.current = { goal, mood, look }
     Object.assign(bridge.current, { onBusy, onMeow })
   })
 
@@ -48,12 +49,14 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
     let lastY = null
 
     Object.assign(bridge.current, {
+      look: latest.current.look, // the breed/outfit to load first
       ready: (scene) => {
         sceneRef.current = scene
         // handy while developing: poke the game from the browser console
         if (import.meta.env.DEV) window.catScene = scene
         scene.brain.setGoal(latest.current.goal)
         scene.setMood(latest.current.mood)
+        scene.setLook(latest.current.look)
         measure()
       },
       onCatScreen: (x, y) => {
@@ -65,11 +68,14 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
       },
     })
 
-    // how much of the bottom of the screen the timer panel covers
+    // how much of the bottom of the screen the timer panel (or the open
+    // wardrobe, whichever reaches higher) covers
     const measure = () => {
-      const panel = panelRef.current
-      if (!panel || !sceneRef.current) return
-      sceneRef.current.setInset(window.innerHeight - panel.getBoundingClientRect().top)
+      if (!sceneRef.current) return
+      const tops = [panelRef.current, sheetRef?.current]
+        .filter((el) => el && el.offsetHeight > 0) // hidden = not covering anything
+        .map((el) => el.getBoundingClientRect().top)
+      if (tops.length) sceneRef.current.setInset(window.innerHeight - Math.min(...tops))
     }
     const observer = new ResizeObserver((entries) => {
       // Phaser doesn't notice every kind of resize on its own, so nudge it
@@ -78,6 +84,7 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
     })
     observer.observe(host)
     if (panelRef.current) observer.observe(panelRef.current)
+    if (sheetRef?.current) observer.observe(sheetRef.current)
     window.addEventListener('resize', measure)
 
     Promise.all([import('phaser'), import('./RoomScene')]).then(([{ default: Phaser }, { RoomScene }]) => {
@@ -85,12 +92,18 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
       game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: host,
-        pixelArt: true, // nearest-neighbour scaling: crisp pixels
-        roundPixels: true,
+        // the HD art is smooth: keep filtering on (no pixelArt mode)
+        pixelArt: false,
+        antialias: true,
         backgroundColor: '#f6e9d3',
         banner: false,
         audio: { noAudio: true },
         scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+        // dev only: ?timerloop ticks on timers instead of animation frames,
+        // so automated tests can run in a hidden browser window
+        ...(import.meta.env.DEV && new URLSearchParams(location.search).has('timerloop')
+          ? { fps: { forceSetTimeOut: true, target: 60 } }
+          : {}),
         scene: new RoomScene(bridge.current),
       })
     })
@@ -102,7 +115,7 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
       game?.destroy(true)
       sceneRef.current = null
     }
-  }, [panelRef])
+  }, [panelRef, sheetRef])
 
   // follow the timer (unless the debug panel took over)
   useEffect(() => {
@@ -111,6 +124,9 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
   useEffect(() => {
     sceneRef.current?.setMood(mood)
   }, [mood])
+  useEffect(() => {
+    sceneRef.current?.setLook(look)
+  }, [look])
 
   return (
     <>
@@ -120,6 +136,8 @@ export function GameCanvas({ ref, goal, mood, panelRef, onBusy, onMeow }) {
           <DebugPanel
             subscribe={subscribe}
             sceneRef={sceneRef}
+            look={look}
+            onLookChange={onLookChange}
             onOverride={(on) => {
               debugOverride.current = on
               if (!on) sceneRef.current?.brain.setGoal(latest.current.goal)
