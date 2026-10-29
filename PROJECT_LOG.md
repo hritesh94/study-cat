@@ -521,7 +521,7 @@ The live app (on `main`) doesn't have the AI yet: it comes with the merge, after
 - Each week is written once and kept (`weekly_reports`), so opening it again is free. A week with no study gets a kind note without asking the AI.
 
 #### Tested
-- `npm run test:ai` (new): **115 checks**, in Node with a fake AI and a fake database. It covers:
+- `npm run test:ai` (new): **122 checks**, in Node with a fake AI and a fake database. It covers:
   - the Gemini request (key in the header, schema, limits, low thinking), skipping its thinking, and busy models (429 retry, straight to the backup on "high demand" or a time-out, then "tired")
   - the prompt order (catVoice first, safety last)
   - distress detection (8 serious messages caught, 5 idioms not)
