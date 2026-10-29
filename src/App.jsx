@@ -7,12 +7,15 @@ import { GameCanvas } from './game/GameCanvas'
 import { lineById, pickLine } from './game/catLines'
 import { PrefsPanel } from './components/PrefsPanel'
 import { SessionSummary } from './components/SessionSummary'
+import { StreakCalendar } from './components/StreakCalendar'
 import { SubjectPicker } from './components/SubjectPicker'
 import { Settings } from './components/Settings'
 import { Wardrobe } from './components/Wardrobe'
-import { liveStreak } from './lib/supabase'
+import { streaksFrom } from './lib/calendar'
+import { liveStreak, localDay } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useCatVoice } from './hooks/useCatVoice'
+import { useDailyTotals } from './hooks/useDailyTotals'
 import { LEAVE_GRACE_MS, useLeaveTracker } from './hooks/useLeaveTracker'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useProfile } from './hooks/useProfile'
@@ -48,7 +51,7 @@ export default function App() {
     studyMinutes: 50,
     breakMinutes: 10,
   })
-  const { todayMinutes, addStudyMs } = useStudyStats()
+  const { todayMinutes: localTodayMinutes, addStudyMs, byDay, bySubjectDay } = useStudyStats()
   const voice = useCatVoice()
 
   // ── Account (Supabase): optional; everything works logged out too ──
@@ -69,13 +72,30 @@ export default function App() {
   const [subjectId, setSubjectId] = useState(null) // this session's subject
   const subject = subjectsApi.subjects.find((s) => s.id === subjectId) ?? null
 
+  // ── Study history: the calendar, "Today: N min" and the streak ──
+  // Logged in it all comes from the server (statsVersion bumps after each
+  // session to fetch again); logged out, from this browser.
+  const [statsVersion, setStatsVersion] = useState(0)
+  const localStats = useMemo(
+    () => ({ byDay, bySubjectDay, subjects: subjectsApi.subjects }),
+    [byDay, bySubjectDay, subjectsApi.subjects],
+  )
+  const today = localDay()
+  const serverToday = useDailyTotals({ userId: profile?.id ?? null, from: today, to: today, version: statsVersion })
+  const todayMinutes = profile && serverToday.ready ? (serverToday.days[today]?.minutes ?? 0) : localTodayMinutes
+  const streakMinutes = gameRules?.streak_min_minutes ?? 25
+  const localStreaks = useMemo(
+    () => streaksFrom(Object.fromEntries(Object.entries(byDay).map(([d, ms]) => [d, Math.floor(ms / 60000)])), streakMinutes),
+    [byDay, streakMinutes],
+  )
+
   const sessionMs = useRef(0) // study time in this session (for the summary card)
   const skipping = useRef(false)
   const timer = useTimer({
     studyMinutes: settings.studyMinutes,
     breakMinutes: settings.breakMinutes,
     onStudyTime: (ms) => {
-      addStudyMs(ms)
+      addStudyMs(ms, subjectId)
       sessionMs.current += ms
     },
     onPhaseChange: (next) => {
@@ -180,11 +200,13 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
   const prefsRef = useRef(null)
   const subjectRef = useRef(null)
+  const calendarRef = useRef(null)
+  const calendarOpener = useRef(null) // the 🔥 or the Today pill, whichever opened it
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
   const prefsButton = useRef(null)
@@ -194,14 +216,19 @@ export default function App() {
   })
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
-    const from = { account: accountButton, prefs: prefsButton, subject: startButton }[openSheet.current] ?? myCatButton
+    const from =
+      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
   }, [])
   const toggleSheet = (name) => setSheet((open) => (open === name ? null : name))
+  const openCalendar = (e) => {
+    calendarOpener.current = e.currentTarget
+    toggleSheet('calendar')
+  }
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef], [])
 
   // ── Study sessions on the server → coins + streak ──
   const [coinPop, setCoinPop] = useState(null)
@@ -215,6 +242,7 @@ export default function App() {
     leaveCount: leaves.current,
     onResult: (r) => {
       mergeProfile({ coins: r.coins, current_streak: r.current_streak, best_streak: r.best_streak, last_study_day: r.last_study_day })
+      setStatsVersion((v) => v + 1)
       if (r.counted_minutes > 0 || r.leave_count > 0) {
         setSummary({ id: Date.now(), minutes: r.counted_minutes, coins: r.coins_awarded, penalty: r.penalty_coins ?? 0, leaves: r.leave_count ?? 0 })
       }
@@ -323,9 +351,15 @@ export default function App() {
               <span className={`stat coins${coinBump ? ' bump' : ''}`} title="Coins" aria-label={`${profile.coins} coins`}>
                 <CoinIcon /> {profile.coins}
               </span>
-              <span className="stat streak" title={`Study streak (best: ${profile.best_streak})`} aria-label={`${streak} day streak`}>
+              <button
+                className="stat streak"
+                onClick={openCalendar}
+                aria-expanded={sheet === 'calendar'}
+                title={`Study streak (best: ${profile.best_streak}). Open the calendar`}
+                aria-label={`${streak} day streak. Open the study calendar`}
+              >
                 <span aria-hidden="true">🔥</span> {streak}
-              </span>
+              </button>
             </>
           )}
           <button
@@ -339,10 +373,10 @@ export default function App() {
             <span aria-hidden="true">🐱</span>
             <span className="mycat-label"> My Cat</span>
           </button>
-          <span className="today" title="Studied today">
+          <button className="today" onClick={openCalendar} aria-expanded={sheet === 'calendar'} title="Studied today. Open the calendar">
             <span className="today-label">Today: </span>
             {todayMinutes} min
-          </span>
+          </button>
           {auth.enabled && auth.ready && (
             <button
               ref={accountButton}
@@ -398,6 +432,17 @@ export default function App() {
 
       <CoinPop pop={coinPop} />
       <SessionSummary summary={summary} onClose={() => setSummary(null)} />
+      <StreakCalendar
+        ref={calendarRef}
+        open={sheet === 'calendar'}
+        onClose={closeSheet}
+        userId={profile?.id ?? null}
+        local={localStats}
+        streak={profile ? streak : localStreaks.current}
+        bestStreak={profile ? profile.best_streak : localStreaks.best}
+        streakMinutes={streakMinutes}
+        version={statsVersion}
+      />
       <SubjectPicker
         ref={subjectRef}
         open={sheet === 'subject'}

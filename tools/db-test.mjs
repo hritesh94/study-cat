@@ -258,6 +258,45 @@ await admin(`update public.game_settings set max_subjects = 50`)
 r = await as(A, `select public.subjects_limit()`)
 check("users can't call the limit function", r.error !== null)
 
+console.log('\nStats for the calendar and the room')
+const cSubjects = (await as(C, `select id, name from public.subjects order by name`)).rows
+const one = cSubjects.find((x) => x.name === 'One').id
+const two = cSubjects.find((x) => x.name === 'Two').id
+async function subjectSession(uid, minutes, subjectId) {
+  const id = (await as(uid, `select public.start_session($1, $2) as id`, [minutes, subjectId])).rows[0].id
+  await backdate(id, minutes)
+  return (await as(uid, `select public.end_session($1, $2) as r`, [id, today])).rows[0].r
+}
+await subjectSession(C, 30, one)
+await subjectSession(C, 20, two)
+await subjectSession(C, 10, null)
+await as(C, `select public.end_session(public.start_session(5), $1::date)`, [today]) // ended at once: 0 minutes
+const real = (await admin(
+  `select sum(counted_minutes)::int as minutes, sum(coins_awarded)::int as coins, count(*) filter (where counted_minutes > 0)::int as sessions
+     from public.study_sessions where user_id = $1 and study_day = $2`, [C, today]))[0]
+r = await as(C, `select * from public.daily_totals($1, $1)`, [today])
+const dayRow = r.rows[0]
+check("daily_totals: today's minutes, coins and sessions match the sessions", dayRow?.minutes === real.minutes && dayRow.coins === real.coins && dayRow.sessions === real.sessions, r.error ?? JSON.stringify({ dayRow, real }))
+const bySubject = Object.fromEntries((dayRow?.subjects ?? []).map((x) => [x.name ?? '(none)', x.minutes]))
+check('daily_totals: minutes per subject, with names', bySubject.One === 30 && bySubject.Two === 20 && bySubject['(none)'] >= 10, JSON.stringify(dayRow?.subjects))
+r = await as(C, `select * from public.daily_totals($1::date - 30, $1::date)`, [today])
+check('daily_totals: only days with study time come back', r.rows.length === 1, r.error ?? JSON.stringify(r.rows))
+r = await as(B, `select * from public.daily_totals($1, $1)`, [today])
+check("Ben's daily_totals don't include Cat's study", r.rows.length === 0, r.error ?? JSON.stringify(r.rows))
+r = await as(A, `select * from public.daily_totals('2026-01-01', '2026-03-31')`)
+check('daily_totals refuses more than 62 days', r.error?.includes('62 days'), r.error ?? 'no error')
+r = await as(A, `select * from public.daily_totals('2026-02-01', '2026-01-01')`)
+check('daily_totals refuses an end before the start', r.error?.includes('62 days'), r.error ?? 'no error')
+r = await as(null, `select * from public.daily_totals('2026-01-01', '2026-01-31')`)
+check("logged-out visitors can't call daily_totals", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(C, `select * from public.subject_totals()`)
+const totals = Object.fromEntries(r.rows.map((x) => [x.name, x.minutes]))
+check('subject_totals: all-time minutes per subject', totals.One === 30 && totals.Two === 20 && r.rows.length === 2, r.error ?? JSON.stringify(r.rows))
+r = await as(B, `select * from public.subject_totals()`)
+check("Ben's subject_totals show only his subjects", r.rows.length === 1 && r.rows[0].name === 'Bio', JSON.stringify(r.rows))
+r = await as(null, `select * from public.subject_totals()`)
+check("logged-out visitors can't call subject_totals", r.error?.includes('permission denied'), r.error ?? 'no error')
+
 console.log('\nEach user sees only their own sessions')
 const mine = await as(A, `select distinct user_id from public.study_sessions`)
 check('Ana only sees her sessions', mine.rows.length === 1 && mine.rows[0].user_id === A)

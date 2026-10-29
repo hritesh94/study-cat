@@ -69,7 +69,10 @@
   gap: 0.6rem;
 }
 
+button.today,
 .today {
+  font: inherit;
+  color: inherit;
   background: var(--paper);
   border: 2.5px solid var(--ink);
   border-radius: var(--wobbly);
@@ -392,5 +395,17 @@ button.book-toggle.on {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* the 🔥 streak and Today pills open the calendar */
+button.stat,
+button.today {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+button.today {
   font-weight: 500;
 }
