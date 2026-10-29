@@ -2,7 +2,8 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (the Phaser pixel cat, merged into `main` and deployed)
+**Live app:** https://study-cat-pink.vercel.app (still the 64 px pixel cat from `main`)
+**Branch `game-cat`:** the HD cat (5 breeds, 5 outfits), not merged or deployed yet
 **Stack:** React 19 + Vite 8 + Phaser 3.90
 **Status:** Phase 1 complete, cozy redesign, and now the game-engine cat (no login, no backend)
 
@@ -14,7 +15,8 @@ Everything built so far, in order, with simple explanations of what each piece d
 |---|---|
 | Pomodoro timer | Default 50 min study / 10 min break, both adjustable (study 1–180, break 1–60). Start, Pause, Reset, Skip. |
 | Auto phases | When study ends, the break starts by itself. When the break ends, the app waits for you to press Start. |
-| Pixel cat | An orange tabby from a sprite pack (3D-rendered into 64 × 64 pixel art), shown 3× or 4× with crisp pixels. A **state machine** (the cat brain) decides what it does, and only uses the transition chains from the pack, so it never snaps between poses. It walks to a spot before using it and turns around before changing direction. |
+| HD cat | A smooth 128 × 128 sprite cat in **5 breeds** (orange, tuxedo, white, calico, siamese), with **5 outfits** it can wear (beanie, scarf, bow, hoodie, flowers). It's shown at up to 1.5× its art size. A **state machine** (the cat brain) decides what it does, and only uses the pack's transition chains, so it never snaps between poses. It walks to a spot before using it and turns around before changing direction. |
+| Your cat | The chosen breed and outfit are saved in `localStorage` (a shop with coins comes later, with Supabase). |
 | Cozy room | Pixel art: wooden floor, rug, a low desk with a cushion, a warm lamp and a steaming mug, a food bowl, a yarn ball, a little bath tub, a plant, a framed paw print, and a window with leaves falling from an autumn tree. On phones the camera follows the cat. |
 | Mood lighting | **Study:** the room dims slightly, the lamp glows warmer, and it turns to dusk outside. **Break:** the room brightens and it's sunny. |
 | Focus view | While studying: fullscreen, and everything hidden except the cat, the room and the time. |
@@ -23,7 +25,7 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Click the cat | It turns to face you, meows (and says a line), then turns back and carries on. |
 | Break mode | The cat closes the book, stands up, walks to the rug, sits and looks at you. Then **Play 🧶** (bats the yarn), **Feed 🐟** (walks to the bowl and eats) and **Bathe 🫧** (hops into the tub, bubbles, a shake, hops out) unlock. |
 | Sad cat | Switch tabs during study and the cat closes its book and is sad (ears down, a tear). When you come back it complains, then goes back to reading after 4 s. |
-| Debug mode | Add `?debug` to the address: a panel with a button for every animation and every brain state, plus slow motion. |
+| Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
 | Voice | The cat speaks short lines using the browser's built-in speech (Web Speech API). Mute button 🔊 in the top bar. |
 | Saved minutes | Today's study minutes are shown at the top and saved in `localStorage`, so they survive a reload. |
 | Saved settings | Your study/break lengths and mute choice are saved too. |
@@ -168,6 +170,34 @@ npm install phaser@3.90.0
   - Phaser missed some window resizes. Now the canvas watches its own size.
 - The old SVG puppet files (`src/cat/`, `src/scene/`) were removed on this branch. They're safe on `main` and in git history.
 
+### Step 14 — HD cat: 5 breeds, 5 outfits · branch `game-cat` (not merged yet)
+Files: `public/game/cat/*`, `tools/cat-generator-hd/*`, `src/game/*`, `src/App.jsx`
+- **The new pack:** `study-cat-hd.zip` (deleted after unpacking). It contains:
+  - `breeds/` and `outfits/` (1280 × 2816 sheets: 10 frames per row, 22 rows of 128 × 128) and `study-cat.json` → `public/game/cat/`.
+  - The generator and previews → `tools/cat-generator-hd/` (not deployed).
+  - The old 64 px sheet and its generator were removed.
+- **Same animations, same rules:** the HD pack has the same 22 animations, with the same frame starts, counts and fps. So the brain kept its names and posture chains.
+  - To make sure, I compared the **last frame of every animation with the first frame of every animation that may follow it**, for all 5 breeds (107 joins each).
+  - Normal motion inside an animation changes about 3.5 % of the cat's outline per frame. Every chain join was in that range, **except three**.
+- **What I found and fixed:**
+  - `eat`, `play` and `sad` have no transition art. Their first and last frames are already head-in-bowl, crouched or slumped, so cutting into them changed 19–41 % of the outline in one frame: a visible snap.
+  - The brain now **crossfades** those joins: a "ghost" copy of the last frame fades out over 0.24 s while the new animation starts underneath (`SOFT_JOIN` in `catAnims.js`).
+  - A real fix later would be to add `eat_start`/`eat_end`-style transitions in the generator.
+- **All breeds share one shape:** the 5 breeds have pixel-identical outlines in every frame (0 % difference). That's why one outfit sheet fits every breed.
+- **Measured, then laid out:** the book sits at frame y 84, and the bowl and yarn 36 px in front of the feet. At 0.5 scale that's exactly the old layout (10 px and 18 px in game pixels), so the cat is drawn at **0.5 scale** and the room's spots didn't change.
+  - The room's own bowl and yarn were 2–4 px too high compared with the ones drawn inside `eat`/`play`, so they hopped when swapped. They were moved down to match.
+- **Smooth, not pixelated:** `pixelArt: false` and `antialias: true`.
+  - The room is now drawn at **3 texture pixels per game pixel** (`RES` in `roomArt.js`), so it stays sharp and smooth like the cat instead of turning blurry or blocky.
+  - The camera zooms smoothly (no longer in whole steps), capped at **3×**. 64 game px × 3 = 192 screen px = the HD art at 1.5×, and phones get ~1.44×.
+- **Breeds:** each breed is its own sheet, so each breed gets its own Phaser animations, named `"<breed>:<animation>"` (e.g. `tuxedo:walk`).
+  - The brain still thinks in plain names (`walk`) and listens for "any animation finished", matching by name. That way the breed can be swapped **mid-animation**: the new breed continues the same animation from the same frame.
+- **Outfits** are a second sprite on top of the cat. Right before every draw (Phaser's `prerender` event, after all game logic), it copies the cat's position, flip, frame number and depth + 1, as the README says. With no outfit, that sprite is hidden.
+- **Loading:** each sheet takes ~14 MB of graphics memory once decoded, so loading all 10 up front would be ~140 MB, too much for many phones.
+  - So the game reads `study-cat.json`, loads only the breed and outfit you're using, and loads others the first time they're picked.
+  - Animations are created from the JSON's `animations` list for each breed as it arrives.
+- **Saved choice:** `studycat:cat` in `localStorage`, e.g. `{"breed":"siamese","outfit":"bow"}`. Unknown values fall back to orange with no outfit.
+- **Debug panel:** new breed and outfit pickers, plus a one-tap "🐢 slow motion" toggle next to the speed buttons.
+
 ---
 
 ## 3. Project structure
@@ -178,8 +208,8 @@ study-cat/
 ├─ package.json             dependencies + scripts (dev, build, lint, preview)
 ├─ public/
 │  ├─ favicon.svg           🐱 tab icon
-│  └─ game/cat/             the sprite sheet + its JSON (loaded by the game)
-├─ tools/cat-generator/     the pack's Python generator, previews, README (not deployed)
+│  └─ game/cat/             study-cat.json + breeds/*.png + outfits/*.png (loaded by the game)
+├─ tools/cat-generator-hd/  the HD pack's Python generator, previews, README (not deployed)
 └─ src/
    ├─ main.jsx              starts React, loads the fonts
    ├─ App.jsx               the screen: timer, panel, voice; tells the cat its goal
@@ -189,11 +219,11 @@ study-cat/
    ├─ components/           Settings, BreakPanel
    └─ game/
       ├─ GameCanvas.jsx     React ↔ Phaser bridge (loads Phaser lazily)
-      ├─ RoomScene.js       the Phaser scene: room, cat, camera, lighting, leaves
+      ├─ RoomScene.js       the Phaser scene: room, cat + outfit, breeds, camera, lighting
       ├─ catBrain.js        ★ the cat's state machine (goals, tasks, scripts)
-      ├─ catAnims.js        each animation's start/end posture + chain route-finder
+      ├─ catAnims.js        each animation's start/end posture, chain route-finder, soft joins
       ├─ layout.js          every spot and prop position (game pixels)
-      ├─ roomArt.js         the pixel-art drawing of the room and props
+      ├─ roomArt.js         the drawing of the room and props (at 3× resolution)
       ├─ DebugPanel.jsx     the ?debug panel
       └─ debug.css
 ```
@@ -213,6 +243,7 @@ study-cat/
 | `studycat:studyMsByDay` | `{"2026-10-29": 90765}` | Milliseconds studied per day |
 | `studycat:settings` | `{"studyMinutes":50,"breakMinutes":10}` | Your timer lengths |
 | `studycat:muted` | `false` | Whether the cat's voice is muted |
+| `studycat:cat` | `{"breed":"tuxedo","outfit":"scarf"}` | Which cat you have and what it wears |
 
 To reset everything, open the browser console on the site and run `localStorage.clear()`.
 
@@ -236,7 +267,18 @@ To reset everything, open the browser console on the site and run `localStorage.
 
 ## 5. How it was tested
 
-**Phaser cat (branch `game-cat`)**, run in the browser at 1280×800 and phone size (375×812), with an automatic recorder that logged every animation, where the cat was, and which way it faced:
+**HD cat (step 14)**, run in the browser at 1280×800 and phone size (375×812):
+- ✅ **The art itself:** all 5 breeds have identical outlines in every frame. Every chain join matches except `eat`, `play` and `sad`, which now crossfade.
+- ✅ **Every animation × every breed (110 combinations):** each played from its own breed's sheet and showed every one of its frames.
+- ✅ **Outfits:** each of the 5 outfits on 2 breeds, while wandering, plus all 22 animations with hoodie+tuxedo and beanie+calico. In about 3,000 checked frames the outfit always had the cat's frame, position, flip and depth + 1, and it hid with no outfit. Swapping breed mid-animation kept everything going.
+- ✅ **By eye:** beanie while walking, scarf while reading (the book sits on the desk top), hoodie mid-turn, flowers while sleeping, bow while meowing, hoodie while eating (the sprite's bowl lines up with the room's).
+- ✅ **The brain, through the real buttons, as a calico in a scarf:** study → `read`, a `page_turn`, sad → back to read (crossfaded in and out), click → meow → back to read, break → rug → `look_at_you` → buttons unlock, Feed, Play, Bathe, click while asleep, pause → wander. **0 chain breaks.**
+- ✅ **Saved choice:** picking siamese + bow in the debug panel survived a reload, and only those two sheets were loaded.
+- ✅ **Phone:** the cat at 1.44× its art, the camera follows it, and its feet stay above the panel (also in break with its taller panel).
+- ✅ Lint and build clean; only the HD sheets and JSON are in the build (`tools/` isn't). Not deployed yet, on purpose.
+- ⚠️ The voice still wasn't listened to (muted during tests).
+
+**64 px pixel cat (step 13)**, run in the browser at 1280×800 and phone size (375×812), with an automatic recorder that logged every animation, where the cat was, and which way it faced:
 - ✅ **Chain breaks: 0** across every test below, so no animation ever started from the wrong pose.
 - ✅ **Wander:** every change of direction was `idle → turn_around → idle → walk`; the cat never slid while not walking; it always faced the way it walked; it sat, looked at you, slept and woke up.
 - ✅ **Study (real Start button):** walk → turn → `sit_down → read_start → read`, even starting from sleep (`wake_up → stand_up → …`). A `page_turn` fired on its own and went back to `read`. The book lines up with the desk top.
@@ -263,7 +305,9 @@ To reset everything, open the browser console on the site and run `localStorage.
 - Fullscreen can be refused by some browsers; the focus view still works in the window.
 - The sprite pack has no bath animation, so **Bathe** is assembled from jump, sit and a shake.
 - A change of plan waits for the current move to finish (up to about 2 s for a long loop like `read`), on purpose, so the cat never snaps.
-- Phaser adds about 320 kB (gzipped) to download. It loads after the page, but the very first visit shows an empty room for a moment.
+- Phaser adds about 320 kB (gzipped) to download, plus ~0.5 MB for a breed sheet and ~0.15 MB for an outfit. They load after the page, but the very first visit shows an empty room for a moment, and picking a new breed or outfit takes a moment the first time.
+- `eat`, `play` and `sad` have no in/out transition art in the pack, so those joins are a quick crossfade rather than real motion.
+- The window's hills and a few room details are still drawn from small rectangles, so up close they have little steps.
 - If the browser tab is in the background, the game pauses (browsers stop drawing hidden pages). The timer keeps counting correctly.
 
 ---
@@ -284,6 +328,8 @@ Example: "when the break starts, sometimes nap on the rug instead".
 3. Try it with `?debug` and `window.catScene.brain.setGoal('lazyBreak')` in the console.
 4. A new place in the room goes in `layout.js` (`SPOTS`); a new prop goes in `roomArt.js`.
 
+**A new breed or outfit:** add it in the generator (`tools/cat-generator-hd/generator/cat_hd.py`, `make.py`), run `python make.py`, and copy its sheet and the new `study-cat.json` into `public/game/cat/`. The game reads the lists from the JSON, so no code changes are needed.
+
 If a new sprite animation is added to the pack, add one line to `ANIMS` in `catAnims.js` saying which posture it starts and ends in. The route-finder then knows how to reach it.
 
 ---
@@ -291,6 +337,7 @@ If a new sprite animation is added to the pack, add one line to `ANIMS` in `catA
 ## 8. Ideas for Phase 2
 
 - Login + backend so minutes sync across devices
+- A shop with coins earned by studying, to buy breeds and outfits (Supabase), replacing the `studycat:cat` localStorage choice
 - History chart and study streaks (the per-day data is already being saved)
 - Sounds (purring, meows, rain on the window) and a "session complete" notification
 - Day/night room that follows your real clock

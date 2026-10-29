@@ -1,7 +1,7 @@
 # Study Cat 🐱
 
 A cozy 2D storybook Pomodoro timer: a cat keeps you company in a warm little room while you study.
-Built with React + Vite + Phaser (pixel art).
+Built with React + Vite + Phaser, with an HD sprite cat in 5 breeds and 5 outfits.
 
 **Live:** https://study-cat-pink.vercel.app · **Full build history and explanations:** [PROJECT_LOG.md](PROJECT_LOG.md)
 
@@ -33,15 +33,16 @@ src/
     catBrain.js           the cat's state machine (goals, tasks, scripts)
     catAnims.js           each animation's start/end posture + chain route-finder
     layout.js             spots and prop positions (game pixels)
-    roomArt.js            the pixel-art room and props
+    roomArt.js            the room and props (drawn at 3× resolution)
     DebugPanel.jsx        the ?debug panel
-public/game/cat/          sprite sheet + JSON
-tools/cat-generator/      the sprite pack's generator, previews, README (not deployed)
+public/game/cat/          study-cat.json, breeds/, outfits/ (HD sprite sheets)
+tools/cat-generator-hd/   the HD pack's generator, previews, README (not deployed)
 ```
 
 ## The cat
 
-The cat is a sprite pack (see `tools/cat-generator/README.md`) driven by a state machine in
+The cat is an HD sprite pack (see `tools/cat-generator-hd/README.md`) driven by a state machine in
 `src/game/catBrain.js`. It only moves through the pack's transition chains, so it never snaps.
-Open `http://localhost:5173/?debug` for buttons for every animation and state, plus slow motion.
-More in [PROJECT_LOG.md](PROJECT_LOG.md) (step 13).
+Breed and outfit are saved in localStorage (`studycat:cat`).
+Open `http://localhost:5173/?debug` for breed/outfit pickers, buttons for every animation and state, plus slow motion.
+More in [PROJECT_LOG.md](PROJECT_LOG.md) (steps 13 and 14).
