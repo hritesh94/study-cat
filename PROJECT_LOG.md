@@ -33,7 +33,7 @@ Everything built so far, in order, with simple explanations of what each piece d
 | Debug mode | Add `?debug` to the address: a panel with a breed picker, an outfit picker, the brain's current state, a button for every animation and every brain state, and slow motion. |
 | Voice | "Cat babble" (2b): each line types into the speech bubble while the cat babbles it in quick, soft, high blips, made live with the Web Audio API (happy = higher and bouncy, sad = lower and slower, annoyed = short and sharp). A recording at `public/voice/<line-id>.mp3` plays instead, if there is one. Mute 🔊 in the top bar (in ⚙️ Settings on phones), plus a volume slider in ⚙️ Settings. |
 | Saved minutes | Today's study minutes are shown at the top. Logged in they come from the server; logged out they're saved in `localStorage`, so they survive a reload. |
-| Accounts (phase-2) | **Log in** with an emailed magic link (no password). Logged in, you earn **coins** for studying and keep a **streak**, both shown in the top bar, with a "+N coins" pop when a session ends. Your cat look is saved to your account. Everything still works logged out. |
+| Accounts (phase-2) | **Log in** with a 6-digit code (or link) sent by email, no password. Logged in, you earn **coins** for studying and keep a **streak**, both shown in the top bar, with a "+N coins" pop when a session ends. Your cat look is saved to your account. Everything still works logged out. |
 | Saved settings | Your study/break lengths and mute choice are saved too. |
 
 ---
@@ -357,6 +357,22 @@ They only add things. `end_session` and `start_session` are rebuilt with one ext
   - plant stages at **0, 3, 7, 14 and 30** streak days (seed, sprout, leafy, bushy, blooming), and the droop (tilted and pale when you had a streak and it's back to 0)
 - Every item has an `art` slot, set to `null` for now, so simple placeholder shapes are drawn. To use real art, drop a PNG in `public/game/room/` and write its path in the config. It loads by itself, at the size in the config. Checked by pointing the blooming plant at an existing PNG.
 - The room drawing itself is unchanged. The shelf and jar sit on the empty wall between the plant and the picture, and the new plant sits on the window sill.
+
+### Step 19 — Log in with a code, friendlier minute boxes
+- **Login code:** on a phone, the email's link opens in whatever browser the mail app picks (Gmail on iPhone opens Chrome), so you ended up logged in there instead of in Safari. The email now also has a **6-digit code**. Type it into the Log in panel (`verifyOtp` in `useAuth.js`) and you're logged in right there, in that browser. The link still works as before.
+  - Supabase only puts the code in the email if the email template asks for it. In **Authentication → Emails → Templates**, both **Magic Link** and **Confirm signup** need `{{ .Token }}` in them (see below).
+  - A wrong or expired code says "That code didn't work…". The box keeps only digits and waits for 6.
+- **Minute boxes:** they used to fix the number on every key press, so clearing the box jumped straight to 1 (and typing 25 after that gave 125). Now the box shows exactly what you type, even nothing. The number is checked only when you leave the box or press Enter: empty goes back to the old value, 0 becomes 1, and too big becomes the maximum (180 study, 60 break).
+
+#### The email templates (Supabase → Authentication → Emails → Templates)
+Put this in both **Magic Link** and **Confirm signup** (a brand-new account gets Confirm signup; after that it's Magic Link):
+```html
+<h2>Log in to Study Cat 🐱</h2>
+<p>Your code:</p>
+<p style="font-size: 28px; font-weight: bold; letter-spacing: 6px">{{ .Token }}</p>
+<p>Type it into Study Cat, in the browser you're using. Or <a href="{{ .ConfirmationURL }}">open this link</a> on this device.</p>
+<p>The code works for an hour. If you didn't ask for it, you can ignore this email.</p>
+```
 
 ---
 

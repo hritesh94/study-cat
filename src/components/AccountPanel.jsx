@@ -8,6 +8,7 @@ function explain(error) {
   const msg = error?.message ?? String(error)
   if (/rate limit|too many/i.test(msg)) return 'Too many emails just now. Please wait a few minutes and try again.'
   if (/invalid.*email|email.*invalid/i.test(msg)) return "That email address doesn't look right."
+  if (/expired|invalid/i.test(msg)) return "That code didn't work. Check it, or send a new email (codes expire after an hour)."
   return msg
 }
 
@@ -17,6 +18,9 @@ export function AccountPanel({ ref, open, onClose, auth, profile, settings, stre
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
   const [message, setMessage] = useState('')
   const [draftName, setDraftName] = useState(null) // null = not edited, show the saved name
+  const [code, setCode] = useState('')
+  const [codeStatus, setCodeStatus] = useState('idle') // idle | checking | error
+  const [codeMessage, setCodeMessage] = useState('')
   const firstField = useRef(null)
 
   useEffect(() => {
@@ -35,9 +39,24 @@ export function AccountPanel({ ref, open, onClose, auth, profile, settings, stre
     try {
       await auth.sendMagicLink(email.trim())
       setStatus('sent')
+      setCode('')
+      setCodeStatus('idle')
     } catch (error) {
       setStatus('error')
       setMessage(explain(error))
+    }
+  }
+
+  // the 6-digit code from the email: logs in right here, in this browser
+  const checkCode = async (e) => {
+    e.preventDefault()
+    setCodeStatus('checking')
+    try {
+      await auth.verifyCode(email.trim(), code.trim())
+      setCodeStatus('idle')
+    } catch (error) {
+      setCodeStatus('error')
+      setCodeMessage(explain(error))
     }
   }
 
@@ -62,7 +81,8 @@ export function AccountPanel({ ref, open, onClose, auth, profile, settings, stre
       {!loggedIn && status !== 'sent' && (
         <form className="account-form" onSubmit={send}>
           <p className="account-note">
-            Log in to save progress and earn coins. We'll email you a magic link, so there's no password to remember.
+            Log in to save progress and earn coins. We'll email you a code (and a link), so there's no password to
+            remember.
           </p>
           <label>
             Email
@@ -94,8 +114,31 @@ export function AccountPanel({ ref, open, onClose, auth, profile, settings, stre
             ✉️
           </p>
           <p>
-            Check your inbox for an email from Study Cat and open the link <strong>on this device</strong>. You'll be
-            logged in right here.
+            We emailed <strong>{email.trim()}</strong>. Type the <strong>code</strong> from the email here to log in
+            in this browser.
+          </p>
+          <form className="account-code" onSubmit={checkCode}>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              aria-label="Code from the email"
+              disabled={codeStatus === 'checking'}
+            />
+            <button className="primary" type="submit" disabled={code.length < 6 || codeStatus === 'checking'}>
+              {codeStatus === 'checking' ? 'Checking…' : 'Log in'}
+            </button>
+          </form>
+          {codeStatus === 'error' && (
+            <p className="account-error" role="alert">
+              {codeMessage}
+            </p>
+          )}
+          <p className="account-note">
+            Or open the link in the email. It logs you in in whichever browser it opens, which on a phone may not be
+            this one.
           </p>
           <button onClick={() => setStatus('idle')}>Use a different email</button>
         </div>

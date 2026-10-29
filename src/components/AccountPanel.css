@@ -50,6 +50,19 @@
 .account-sent button {
   align-self: flex-start;
 }
+/* the 6-digit code from the email */
+.account-code {
+  display: flex;
+  gap: 0.5rem;
+}
+.account-code input {
+  width: 9.5rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 1.3rem;
+  letter-spacing: 0.25em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .account-big {
   font-size: 2rem;
   line-height: 1;
