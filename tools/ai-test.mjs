@@ -20,6 +20,7 @@ import { quiz, validQuestions } from '../supabase/functions/_shared/handlers/qui
 import { describeWeek, mondayOf, report } from '../supabase/functions/_shared/handlers/report.js'
 import { buildSchedule, dayTarget } from '../src/ai/schedule.js'
 import { NEET_PG } from '../src/data/syllabus/neet-pg.js'
+import { LINES, SAMPLE_LINES, SITUATIONS, lineById, pickLine } from '../src/game/catLines.js'
 
 let passed = 0
 const failures = []
@@ -442,6 +443,40 @@ console.log('\nNEET PG')
   await chat({ message: 'I am preparing for NEET' }, deps(store, ai))
   check('onboarding asks "UG or PG?" when they just say NEET', ai.calls[0].system.includes('ask whether it\'s NEET UG or NEET PG') && ai.calls[0].schema.properties.goal.properties.kind.enum.includes('neet_pg'))
   check('the built-in NEET PG syllabus: 19 subjects, every topic in one of them, unique ids', NEET_PG.subjects.length === 19 && NEET_PG.chapters.every((c) => NEET_PG.subjects.includes(c.subject)) && new Set(NEET_PG.chapters.map((c) => c.id)).size === NEET_PG.chapters.length)
+}
+
+console.log('\nCat lines (personality × language × situation)')
+{
+  const pick = (situation, ctx, times = 60) => Array.from({ length: times }, () => pickLine(situation, ctx))
+  for (const id of ['greet.01', 'start.easy.01', 'leave.toxic.07', 'penalty.medium.03', 'meow.01', 'react.bathe.08', 'diva.en.greet.09', 'diva.hinglish.streak_broken.03']) {
+    if (!lineById(id)) check(`old id ${id} still works`, false)
+  }
+  check('every old and Diva id still works (spot check)', ['greet.01', 'leave.toxic.07', 'diva.en.greet.09'].every((id) => lineById(id)))
+  check('old ids are Sweet lines now', lineById('start.easy.01').personality === 'sweet' && lineById('start.easy.01').situation === 'session_start')
+  check('all ids are unique', new Set(LINES.map((l) => l.id)).size === LINES.length)
+  check('every personality has every situation in English', ['sweet', 'diva', 'gang', 'savage'].every((p) => SITUATIONS.every((s) => LINES.some((l) => l.personality === p && l.language === 'en' && l.situation === s))))
+  check('starter sets: 8+ English and 5+ Hinglish per situation (Sweet, Gang, Savage)', ['sweet', 'gang', 'savage'].every((p) => SITUATIONS.every((s) => LINES.filter((l) => l.personality === p && l.language === 'en' && l.situation === s && !l.spicy && !l.strict).length >= 8 && LINES.filter((l) => l.personality === p && l.language === 'hinglish' && l.situation === s && !l.spicy).length >= 5)))
+  check('no swearing outside spicy lines', LINES.filter((l) => !l.spicy).every((l) => !/\b(shit|damn|hell|ass|bitch|bullshit)\b/i.test(l.text)))
+  check('only Sweet has strict lines', LINES.filter((l) => l.strict).every((l) => l.personality === 'sweet'))
+  let lines = pick('greet', { personality: 'diva', language: 'en', spicy: false })
+  check('Diva greets in Diva', lines.every((l) => l.id.startsWith('diva.en.greet.')))
+  check('spicy lines only when spicy is on', lines.every((l) => !lineById(l.id).spicy) && pick('greet', { personality: 'diva', spicy: true }, 200).some((l) => lineById(l.id).spicy))
+  lines = pick('coin_cap', { personality: 'gang', language: 'hinglish' })
+  check('Hinglish when chosen', lines.every((l) => l.id.startsWith('gang.hinglish.')))
+  lines = pick('leave', { personality: 'sweet', strict: true })
+  check('Sweet on Strict: the firm lines (the old Toxic ones)', lines.every((l) => l.id.startsWith('leave.toxic.')))
+  lines = pick('leave', { personality: 'sweet', strict: false })
+  check('Sweet on Chill / Normal: never the firm ones', lines.every((l) => !lineById(l.id).strict))
+  lines = pick('quit_early', { personality: 'sweet' })
+  check('Sweet quitting early: gentle', lines.every((l) => l.id.startsWith('sweet.en.quit_early.')))
+  lines = pick('meow', { personality: 'savage', language: 'hinglish' })
+  check('shared lines (meow) for every personality', lines.every((l) => l.id.startsWith('meow.')))
+  const n = pickLine('streak_milestone', { personality: 'savage', n: 21 })
+  check('{n} becomes the streak', n.text.includes('21') && !n.text.includes('{n}'), n.text)
+  const pack = [{ id: 'pack.x.1', situation: 'greet', mood: 'happy', text: 'Fresh hello from today!' }]
+  check("today's AI pack comes first", pickLine('greet', { personality: 'diva', pack }).text === 'Fresh hello from today!' && pickLine('leave', { personality: 'diva', pack }).id.startsWith('diva.'))
+  check('never the same line twice in a row', pick('greet', { personality: 'gang' }, 40).every((l, i, all) => i === 0 || l.id !== all[i - 1].id))
+  check('the picker has a sample in each voice', Object.entries(SAMPLE_LINES).every(([p, id]) => lineById(id)?.personality === p))
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`)

@@ -42,13 +42,17 @@ import './App.css'
 // What the cat says lives in src/game/catLines.js.
 const BREAK_LINE = lineById('break.idle.01')
 
-// What the cat says when you come back to the tab, by study mode.
-// Medium: the first leaves are free, the last free one gets called out,
-// after that every leave costs coins.
-function leaveLine(mode, count, freeLeaves) {
-  if (mode !== 'medium') return pickLine('leave', mode)
-  return pickLine(count < freeLeaves ? 'leave' : count === freeLeaves ? 'callout' : 'penalty', 'medium')
+// What the cat says when you come back after leaving the tab. On Normal
+// strictness the first leaves are free, the last free one gets called out,
+// and after that every leave costs coins: a Sweet cat says so.
+function leaveSituation(personality, mode, count, freeLeaves) {
+  if (mode !== 'medium' || personality !== 'sweet') return 'leave'
+  return count < freeLeaves ? 'leave' : count === freeLeaves ? 'callout' : 'penalty'
 }
+
+// streak days worth a celebration (and then every 50)
+const MILESTONES = new Set([3, 5, 7, 10, 14, 21, 30, 45, 60, 75, 100])
+const isMilestone = (n) => MILESTONES.has(n) || (n > 100 && n % 50 === 0)
 
 // Browsers only allow fullscreen right after a click, so we call this from
 // the Start button. If it's refused, the focus view still works in the window.
@@ -82,6 +86,16 @@ export default function App() {
     setLocalMode(mode)
     if (profile) updateProfile({ study_mode: mode })
   }
+
+  // ── How the cat talks: personality, language, spicy (on your profile when logged in) ──
+  const [localStyle, setLocalStyle] = useLocalStorage('studycat:catStyle', { personality: 'sweet', language: 'en', spicy: false })
+  const catStyle = profile ? { personality: profile.personality ?? 'sweet', language: profile.language ?? 'en', spicy: !!profile.spicy } : localStyle
+  const setCatStyle = (fields) => {
+    setLocalStyle({ ...catStyle, ...fields })
+    if (profile) updateProfile(fields)
+  }
+  // a line for a situation, in this cat's voice (see src/game/catLines.js)
+  const line = (situation, extra) => pickLine(situation, { ...catStyle, strict: studyMode === 'toxic', ...extra })
 
   // ── Subjects: what you're studying (picked when a session starts) ──
   const subjectsApi = useSubjects(profile?.id ?? null)
@@ -130,17 +144,23 @@ export default function App() {
     onPhaseChange: (next) => {
       if (next === 'break') {
         exitFullscreen()
-        // skipping isn't finishing: no praise (and Toxic mode notices)
-        if (!skipping.current) voice.say(pickLine('finish', studyMode))
-        else if (studyMode === 'toxic') voice.say(pickLine('quit', 'toxic'))
+        // skipping isn't finishing: no praise
+        voice.say(line(skipping.current ? 'quit_early' : 'finish_full'))
+        // and a few seconds later, the break itself
+        clearTimeout(breakHello.current)
+        breakHello.current = setTimeout(() => !latest.current.lineShowing && latest.current.say(latest.current.line('break_start')), 7000)
       } else {
-        voice.say(pickLine('break.end'))
+        clearTimeout(breakHello.current)
+        voice.say(line('break.end'))
       }
       skipping.current = false
     },
   })
 
   const focusing = timer.phase === 'study' && timer.running
+  const breakHello = useRef(null)
+  useEffect(() => () => clearTimeout(breakHello.current), [])
+
 
   // ── Phones: keep the screen on while studying ──
   // Book mode = you're reading on paper, so the screen may go to sleep:
@@ -150,12 +170,13 @@ export default function App() {
   const toggleBookMode = () => {
     const on = !bookMode
     setBookMode(on)
-    if (on) voice.say(pickLine('book.on'))
+    if (on) voice.say(line('book.on'))
   }
 
   // ── Leaving the tab during study ──
-  // The cat looks sad while you're away (Toxic: turns its back on you), then
-  // says something when you're back. Under 15 seconds away doesn't count.
+  // The cat looks sad while you're away (Strict: turns its back on you),
+  // tells you off when you're back, and welcomes you back a moment later.
+  // Under 15 seconds away doesn't count.
   // The server turns the count into coins.
   const [away, setAway] = useState(null) // null | 'sad' | 'sulk'
   const cheerUp = useRef(null)
@@ -170,12 +191,18 @@ export default function App() {
     onReturn: ({ count, counted, book, awayMs }) => {
       clearTimeout(cheerUp.current)
       if (book) {
-        if (awayMs >= LEAVE_GRACE_MS) voice.say(pickLine('book.back'))
+        if (awayMs >= LEAVE_GRACE_MS) voice.say(line('book.back'))
         return
       }
       if (!counted) return setAway(null) // just a quick look away: all forgiven
-      voice.say(leaveLine(studyMode, count, gameRules?.medium_free_leaves ?? 2))
-      cheerUp.current = setTimeout(() => setAway(null), studyMode === 'toxic' ? 6000 : 4000)
+      voice.say(line(leaveSituation(catStyle.personality, studyMode, count, gameRules?.medium_free_leaves ?? 2)))
+      cheerUp.current = setTimeout(
+        () => {
+          setAway(null)
+          latest.current.say(latest.current.line('come_back'))
+        },
+        studyMode === 'toxic' ? 6000 : 4500,
+      )
       setForgiveCard({ id: Date.now(), kind: 'ask' })
     },
   })
@@ -190,7 +217,7 @@ export default function App() {
     if (!leaves.forgive()) return setForgiveCard(null)
     clearTimeout(cheerUp.current)
     setAway(null)
-    voice.say(pickLine('forgive', studyMode))
+    voice.say(line('forgive'))
     const phone = window.matchMedia?.('(pointer: coarse)').matches
     setForgiveCard(phone && !bookMode ? { id: Date.now(), kind: 'tip' } : null)
   }
@@ -208,7 +235,9 @@ export default function App() {
   useEffect(() => {
     latest.current = {
       say: voice.say,
+      line,
       lineShowing: !!voice.line,
+      streakBroken: roomProgress.broken,
       // logged out there's no server result, so the summary comes from here
       onFocusEnd: () => {
         const minutes = Math.floor(sessionMs.current / 60000)
@@ -217,6 +246,22 @@ export default function App() {
       },
     }
   })
+  // Now and then during a long session (every 20-30 minutes), a little word.
+  useEffect(() => {
+    if (!focusing) return
+    let timeout
+    const next = () => {
+      timeout = setTimeout(
+        () => {
+          if (!latest.current.lineShowing) latest.current.say(latest.current.line('mid_session'))
+          next()
+        },
+        (20 + Math.random() * 10) * 60000,
+      )
+    }
+    next()
+    return () => clearTimeout(timeout)
+  }, [focusing])
   const wasFocusing = useRef(false)
   useEffect(() => {
     if (wasFocusing.current && !focusing && !profile) latest.current.onFocusEnd()
@@ -330,16 +375,22 @@ export default function App() {
     subjectId: () => (subjectId && !subjectId.startsWith('local-') ? subjectId : null),
     leaveCount: leaves.current,
     onResult: (r) => {
+      const streakUp = r.current_streak > (profile?.current_streak ?? 0) && isMilestone(r.current_streak)
       mergeProfile({ coins: r.coins, current_streak: r.current_streak, best_streak: r.best_streak, last_study_day: r.last_study_day })
       setStatsVersion((v) => v + 1)
       if (r.counted_minutes > 0 || r.leave_count > 0) {
         setSummary({ id: Date.now(), minutes: r.counted_minutes, coins: r.coins_awarded, penalty: r.penalty_coins ?? 0, leaves: r.leave_count ?? 0 })
       }
+      if (streakUp) {
+        game.current?.celebrate()
+        voice.say(line('streak_milestone', { n: r.current_streak }))
+      }
       if (r.coins_awarded <= 0 && !r.capped) return
       setCoinPop({ id: Date.now(), coins: r.coins_awarded })
       setCoinBump(true)
+      if (streakUp) return
       game.current?.celebrate()
-      voice.say(pickLine(r.coins_awarded > 0 ? 'coins.earned' : 'coins.cap'))
+      voice.say(line(r.coins_awarded > 0 ? 'coins.earned' : 'coin_cap'))
     },
     onError: (error) => console.warn('[study session]', error.message),
   })
@@ -372,7 +423,7 @@ export default function App() {
         setCoinBump(true)
       }
       game.current?.celebrate()
-      latest.current.say(pickLine('goal.done'))
+      latest.current.say(latest.current.line('goal.done'))
     })
   }, [goalTarget, serverToday.ready, todayMinutes, today, claimDailyGoal, mergeProfile])
 
@@ -405,7 +456,7 @@ export default function App() {
         setCoinBump(true)
       }
       game.current?.celebrate()
-      latest.current.say(pickLine('quiz.done'))
+      latest.current.say(latest.current.line('quiz.done'))
     },
   })
   // the topic: this session's roadmap chapter, else its subject
@@ -449,19 +500,31 @@ export default function App() {
 
   // ── Break reactions: Play / Feed / Bathe ──
   const doBreakAction = (action) => {
-    voice.say(pickLine(`react.${action.animation}`))
+    voice.say(line(`react.${action.animation}`))
     game.current?.command(action.animation)
   }
   const bubble = voice.line ?? (timer.phase === 'break' ? { ...BREAK_LINE, shown: BREAK_LINE.text.length } : null)
 
   // The first tap anywhere: the cat says hello (sound needs a tap first).
+  // If your streak broke, once a day it says so instead (kindly, in its way).
   const greeted = useRef(false)
   useEffect(() => {
     const greet = () => {
       if (greeted.current) return
       greeted.current = true
+      let situation = 'greet'
+      if (latest.current.streakBroken) {
+        try {
+          if (localStorage.getItem('studycat:brokenSaid') !== localDay()) {
+            localStorage.setItem('studycat:brokenSaid', localDay())
+            situation = 'streak_broken'
+          }
+        } catch {
+          // no storage: just say hello
+        }
+      }
       // after the tap's own reaction (e.g. Start says its line first)
-      setTimeout(() => !latest.current.lineShowing && latest.current.say(pickLine('greet'), { meow: true }), 250)
+      setTimeout(() => !latest.current.lineShowing && latest.current.say(latest.current.line(situation), { meow: true }), 250)
     }
     window.addEventListener('pointerdown', greet, { once: true })
     return () => window.removeEventListener('pointerdown', greet)
@@ -491,12 +554,12 @@ export default function App() {
       setAway(null)
       setSummary(null)
       setForgiveCard(null)
-      voice.say(pickLine('start', studyMode))
+      voice.say(line('session_start'))
     }
     timer.start()
   }
-  // Toxic mode has opinions about stopping early
-  const quitLine = () => focusing && studyMode === 'toxic' && voice.say(pickLine('quit', 'toxic'))
+  // stopping a study session early (Pause / Reset); Skip says it at the break
+  const quitLine = () => focusing && voice.say(line('quit_early'))
   const pause = () => {
     exitFullscreen()
     quitLine()
@@ -522,7 +585,7 @@ export default function App() {
         onLookChange={setCatLook}
         coverRefs={coverRefs}
         onBusy={setCatBusy}
-        onMeow={() => voice.say(pickLine('meow'), { meow: true })}
+        onMeow={() => voice.say(line('meow'), { meow: true })}
         // tapping the cat (logged in, not while studying) opens the chat, after its meow
         onCatTap={() => profile && !focusing && !openSheet.current && setTimeout(() => setSheet('chat'), 700)}
       />

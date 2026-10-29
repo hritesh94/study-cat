@@ -5,7 +5,7 @@ import './PrefsPanel.css'
 // Strictness: what leaving the tab costs. The ids are the database's
 // study_mode values (easy / medium / toxic); the server's penalty rules for
 // them are unchanged. HOW the cat talks is the personality, set separately.
-export const STRICTNESS = [
+const STRICTNESS = [
   { id: 'easy', emoji: '😺', name: 'Chill', about: 'Leaving the tab makes the cat a little sad. No coins lost.' },
   { id: 'medium', emoji: '😼', name: 'Normal', about: '2 free trips away per session. Each one after that costs 10% of its coins.' },
   { id: 'toxic', emoji: '😾', name: 'Strict', about: 'Every trip away costs 5 coins, and the cat turns its back on you.' },
