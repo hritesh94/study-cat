@@ -11,7 +11,8 @@
     "thumbs": "node tools/make-thumbs.mjs",
     "test:db": "node tools/db-test.mjs",
     "voice:lines": "node scripts/export-lines.mjs",
-    "meows": "node tools/make-meows.mjs"
+    "meows": "node tools/make-meows.mjs",
+    "test:ai": "node tools/ai-test.mjs"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",

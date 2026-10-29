@@ -18,15 +18,16 @@ const db = await PGlite.create()
 await db.exec(`
   create role anon nologin;
   create role authenticated nologin;
+  create role service_role nologin bypassrls; -- the server's own key (Edge Functions)
   create schema auth;
   create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb not null default '{}');
   create function auth.uid() returns uuid language sql stable
     as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth, public to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
+  grant usage on schema auth, public to anon, authenticated, service_role;
+  grant execute on function auth.uid() to anon, authenticated, service_role;
   -- Supabase's defaults: new tables and functions are open to everyone
-  alter default privileges in schema public grant all on tables to anon, authenticated;
-  alter default privileges in schema public grant execute on functions to anon, authenticated;
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 `)
 for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
   await db.exec(readFileSync(join(dir, file), 'utf8'))
@@ -53,6 +54,17 @@ async function as(uid, sql, params) {
   } finally {
     await db.exec(`reset role`)
     await db.query(`select set_config('request.jwt.claim.sub', '', false)`)
+  }
+}
+// run as the Edge Functions' server key (service_role)
+async function asService(sql, params) {
+  await db.exec(`set role service_role`)
+  try {
+    return { rows: (await db.query(sql, params)).rows, error: null }
+  } catch (error) {
+    return { rows: [], error: error.message }
+  } finally {
+    await db.exec(`reset role`)
   }
 }
 // pretend a session started `minutes` ago (only the test, as admin, can do this)
@@ -314,6 +326,76 @@ check('bad values are ignored, not saved', r.rows[0]?.legacy_minutes === 0 && !r
 const coinsB = (await admin(`select coins, legacy_minutes from public.profiles where id = $1`, [B]))[0]
 const earnedB = (await admin(`select sum(coins_awarded)::int as n from public.study_sessions where user_id = $1`, [B]))[0].n
 check('imported minutes give no coins (coins = only what sessions earned)', coinsB.legacy_minutes === 1234 && coinsB.coins === earnedB, `${coinsB.coins} vs ${earnedB}`)
+
+console.log('\nAI limits (migration 7)')
+r = await as(A, `select public.ai_reserve($1, 'chat')`, [A])
+check("users can't take AI calls themselves", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(A, `select public.ai_release($1, 'chat')`, [A])
+check("users can't give AI calls back (that would be unlimited)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(null, `select public.ai_reserve($1, 'chat')`, [A])
+check("logged-out visitors can't either", r.error?.includes('permission denied'), r.error ?? 'no error')
+const reserve = async (uid, kind) => (await asService(`select public.ai_reserve($1, $2) as r`, [uid, kind])).rows[0]?.r
+const limits = { chat: 30, roadmap: 3, quiz: 10, report: 1 }
+for (const [kind, limit] of Object.entries(limits)) {
+  let last
+  for (let i = 0; i < limit; i++) last = await reserve(A, kind)
+  const over = await reserve(A, kind)
+  check(`${kind}: ${limit} a day, then refused`, last?.allowed === true && last.used === limit && over?.allowed === false && over.limit === limit, JSON.stringify({ last, over }))
+}
+check("one user's limit doesn't touch another's", (await reserve(B, 'report'))?.allowed === true)
+await asService(`select public.ai_release($1, 'quiz')`, [A])
+check('a failed AI call is given back (one more allowed)', (await reserve(A, 'quiz'))?.allowed === true && (await reserve(A, 'quiz'))?.allowed === false)
+for (let i = 0; i < 5; i++) await asService(`select public.ai_release($1, 'report')`, [B])
+check('giving back never goes below 0', (await admin(`select used from public.ai_usage where user_id = $1 and kind = 'report'`, [B]))[0].used === 0)
+r = await asService(`select public.ai_reserve($1, 'poems')`, [A])
+check('an unknown kind is refused', r.error?.includes('Unknown AI kind'), r.error ?? 'no error')
+await admin(`update public.game_settings set ai_chat_daily_limit = 31`)
+check('the limits live in game_settings', (await reserve(A, 'chat'))?.allowed === true && (await reserve(A, 'chat'))?.allowed === false)
+await admin(`update public.game_settings set ai_chat_daily_limit = 30`)
+r = await as(A, `select kind, used from public.ai_usage`)
+check('users see their own AI usage only', r.rows.length === 4 && r.rows.every((x) => x.used > 0), JSON.stringify(r.rows))
+r = await as(A, `update public.ai_usage set used = 0`)
+check("users can't reset their usage", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(A, `insert into public.ai_usage (user_id, day, kind, used) values ($1, '2030-01-01', 'chat', 0)`, [A])
+check("users can't add usage rows", r.error?.includes('permission denied'), r.error ?? 'no error')
+
+console.log('\nChat messages (migration 8)')
+r = await as(A, `insert into public.chat_messages (user_id, role, text) values ($1, 'cat', 'I am the cat')`, [A])
+check("users can't write the cat's lines", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await asService(
+  `insert into public.chat_messages (user_id, role, text, meta) values ($1, 'user', 'hi', '{}'), ($1, 'cat', 'mrrp', '{"suggest":"quiz"}'), ($2, 'user', 'ben here', '{}')`,
+  [A, B],
+)
+check('the chat function saves messages', !r.error, r.error ?? '')
+r = await as(A, `select text from public.chat_messages order by id`)
+check('Ana reads only her chat', r.rows.length === 2 && r.rows[1].text === 'mrrp', JSON.stringify(r.rows))
+r = await as(A, `delete from public.chat_messages returning id`)
+check('Ana can clear her chat', r.rows.length === 2 && (await admin(`select count(*)::int as n from public.chat_messages where user_id = $1`, [A]))[0].n === 0)
+check("clearing doesn't touch Ben's chat", (await admin(`select count(*)::int as n from public.chat_messages where user_id = $1`, [B]))[0].n === 1)
+r = await asService(`insert into public.chat_messages (user_id, role, text) values ($1, 'user', $2)`, [A, 'x'.repeat(8001)])
+check('a message over 8000 characters is refused', r.error !== null)
+
+console.log('\nGoals (migration 8)')
+const goalSql = `insert into public.goals (kind, title, deadline, hours_per_day, subjects) values ($1, $2, $3, $4, $5) returning id, user_id`
+r = await as(A, goalSql, ['neet', 'NEET UG 2027', '2027-05-02', 6, JSON.stringify([{ name: 'Physics', level: 'weak' }])])
+const goalA = r.rows[0]?.id
+check('Ana sets a goal (it is hers automatically)', r.rows[0]?.user_id === A, r.error ?? '')
+r = await as(A, goalSql, ['jee_main', 'JEE', '2027-01-20', 5, '[]'])
+check('only one active goal at a time', r.error?.includes('duplicate') || r.error?.includes('unique'), r.error ?? 'no error')
+r = await as(A, `insert into public.goals (user_id, kind, title, deadline, hours_per_day) values ($1, 'neet', 'x', '2027-05-02', 4)`, [B])
+check("Ana can't make a goal for Ben", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(B, goalSql, ['custom', 'Learn Spanish', '2027-03-01', 0.25, '[]'])
+check('less than half an hour a day is refused', r.error?.includes('check'), r.error ?? 'no error')
+r = await as(B, goalSql, ['custom', 'Learn Spanish', '2027-03-01', 1, '[]'])
+const goalB = r.rows[0]?.id
+r = await as(A, `update public.goals set hours_per_day = 7, done_chapters = '{phy_units}' where id = $1 returning hours_per_day`, [goalA])
+check('Ana can change her goal', Number(r.rows[0]?.hours_per_day) === 7, r.error ?? '')
+r = await as(A, `update public.goals set hours_per_day = 1 where id = $1 returning id`, [goalB])
+check("Ana can't change Ben's goal", r.rows.length === 0)
+r = await as(A, `select id from public.goals`)
+check('Ana sees only her goal', r.rows.length === 1 && r.rows[0].id === goalA)
+r = await as(A, `update public.goals set user_id = $2 where id = $1`, [goalA, B])
+check("a goal can't be moved to someone else", r.error?.includes('permission denied'), r.error ?? 'no error')
 
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {
