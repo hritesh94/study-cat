@@ -20,6 +20,7 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
   return {
     name: 'gemini',
     model: models[0],
+    models,
     async generate({ system, messages, schema, maxTokens, temperature = 0.8, timeoutMs = 30000 }) {
       const body = JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
@@ -35,11 +36,16 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
         },
       })
 
-      // Busy or too slow? Go straight to the next model. Only a 429 (the
-      // rate limit, which passes quickly) is first tried once more on the
-      // same model, after a short wait. When every model is busy, the cat
-      // says it's tired.
+      // Try the models in order:
+      //   • busy ("high demand"), too slow, or its free quota used up → the next model
+      //   • a 429 that says to wait only a few seconds (the per-minute limit) →
+      //     wait that long and try the same model once more
+      //   • a model that refuses the request itself (e.g. it was renamed) → the next model
+      // All busy → "the cat is tired"; all refusing → ai_down.
+      let busy = false
+      const refused = []
       for (const [m, model] of models.entries()) {
+        const next = m + 1 < models.length ? 'trying the next model' : 'giving up'
         for (let attempt = 0; attempt < 2; attempt++) {
           let res
           try {
@@ -53,22 +59,27 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
             if (error?.name === 'TimeoutError' || error?.name === 'AbortError') res = { status: TIMED_OUT }
             else throw new AiError('ai_down', `Gemini unreachable: ${error.message}`)
           }
-          if (res.status === 429 && attempt === 0) {
-            await wait(AI.retryAfterMs)
-            continue
-          }
           if (BUSY.has(res.status) || res.status === TIMED_OUT) {
-            // Google's own words (e.g. "high demand", or a quota with "limit: 0",
-            // which means this key gets no free use of that model at all)
-            const why = res.status === TIMED_OUT ? `no answer within ${timeoutMs / 1000} s` : (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 400)
-            console.warn(`[ai] ${model} is busy (${res.status}): ${why} → ${m + 1 < models.length ? 'trying the backup model' : 'giving up'}`)
+            // Google's own words: "high demand", or "You exceeded your current
+            // quota" with a retryDelay (seconds for the per-minute limit, much
+            // longer when the day's free allowance is gone)
+            const why = res.status === TIMED_OUT ? `no answer within ${timeoutMs / 1000} s` : (await res.text().catch(() => '')).replace(/\s+/g, ' ')
+            const delay = Number(why.match(/"retryDelay":\s*"(\d+(?:\.\d+)?)s"/)?.[1])
+            const quick = res.status === 429 && attempt === 0 && (Number.isNaN(delay) ? !/quota/i.test(why) : delay <= 5)
+            if (quick) {
+              await wait(Number.isNaN(delay) ? AI.retryAfterMs : delay * 1000 + 200)
+              continue
+            }
+            busy = true
+            const what = res.status === 429 && /quota/i.test(why) ? 'is out of free quota' : 'is busy'
+            console.warn(`[ai] ${model} ${what} (${res.status}): ${why.slice(0, 400)} → ${next}`)
             break
           }
-          // the fallback model can't be used (e.g. renamed): that's not "busy"
           if (!res.ok) {
-            const detail = `Gemini ${res.status} (${model}): ${(await res.text()).slice(0, 300)}`
-            if (m > 0) throw new AiError('tired', detail)
-            throw new AiError('ai_down', detail)
+            const detail = `${model} ${res.status}: ${(await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`
+            refused.push(detail)
+            console.warn(`[ai] ${detail} → ${next}`)
+            break
           }
 
           const data = await res.json()
@@ -86,7 +97,8 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
           return { text, finishReason: candidate.finishReason, model }
         }
       }
-      throw new AiError('tired', `Gemini is busy (${models.join(', ')})`)
+      if (busy) throw new AiError('tired', `Gemini is busy (${models.join(', ')})`)
+      throw new AiError('ai_down', `Gemini refused the request: ${refused.join(' | ')}`)
     },
   }
 }

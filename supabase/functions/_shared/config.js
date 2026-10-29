@@ -12,8 +12,11 @@ export const AI = {
   // 3.6 first: on 2026-10-30 the newest one (3.8) answered "this model is
   // currently experiencing high demand" to free-tier calls.
   models: { gemini: 'gemini-3.6-flash' },
-  // when that one is too busy (or too slow), the cat asks this one
-  fallbackModels: { gemini: 'gemini-3.8-flash' },
+  // When that one is busy, too slow, or its free quota is used up, the cat
+  // asks these, in order. Every free model has its own allowance, and the
+  // Flash-Lite ones usually get the most (all stable and "Free of charge"
+  // on the same two pages, checked 2026-10-30).
+  fallbackModels: { gemini: ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'] },
   // Flash can't switch thinking off; "low" keeps it quick. Thinking tokens
   // count toward maxTokens below, so those leave room for it.
   thinkingLevel: 'low',
