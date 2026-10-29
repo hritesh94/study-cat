@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import './Sheet.css'
 import './PrefsPanel.css'
 
-const STUDY_MODES = [
-  { id: 'easy', emoji: '😺', name: 'Easy', about: 'Leaving the tab makes the cat a little sad. No coins lost.' },
-  { id: 'medium', emoji: '😼', name: 'Medium', about: '2 free trips away per session. Each one after that costs 10% of its coins.' },
-  { id: 'toxic', emoji: '😾', name: 'Toxic', about: 'The cat roasts you every time you leave, and each leave costs 5 coins.' },
+// Strictness: what leaving the tab costs. The ids are the database's
+// study_mode values (easy / medium / toxic); the server's penalty rules for
+// them are unchanged. HOW the cat talks is the personality, set separately.
+export const STRICTNESS = [
+  { id: 'easy', emoji: '😺', name: 'Chill', about: 'Leaving the tab makes the cat a little sad. No coins lost.' },
+  { id: 'medium', emoji: '😼', name: 'Normal', about: '2 free trips away per session. Each one after that costs 10% of its coins.' },
+  { id: 'toxic', emoji: '😾', name: 'Strict', about: 'Every trip away costs 5 coins, and the cat turns its back on you.' },
 ]
 
 // The ⚙️ settings sheet: sound and study mode (book mode joins on phones).
@@ -66,9 +69,9 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
       </div>
 
       <fieldset className="modes" disabled={modeLocked}>
-        <legend className="prefs-label">Study mode</legend>
+        <legend className="prefs-label">Strictness</legend>
         <div className="mode-list">
-          {STUDY_MODES.map((m) => (
+          {STRICTNESS.map((m) => (
             <button
               key={m.id}
               type="button"
@@ -83,13 +86,13 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
             </button>
           ))}
         </div>
-        {modeLocked && <p className="prefs-note">You can change the mode after this study session.</p>}
+        {modeLocked && <p className="prefs-note">You can change strictness after this study session.</p>}
       </fieldset>
 
       {confirmToxic && (
-        <div className="toxic-confirm" role="alertdialog" aria-label="Turn on Toxic mode?">
+        <div className="toxic-confirm" role="alertdialog" aria-label="Turn on Strict?">
           <p>
-            <strong>Are you sure?</strong> The cat will roast you.
+            <strong>Are you sure?</strong> Every trip away from the tab costs 5 coins.
           </p>
           <div className="toxic-buttons">
             <button
@@ -99,7 +102,7 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
                 onModeChange('toxic')
               }}
             >
-              Roast me 😾
+              Yes, strict 😾
             </button>
             <button onClick={() => setConfirmToxic(false)}>Never mind</button>
           </div>

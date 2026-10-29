@@ -552,6 +552,20 @@ check('a NEET PG goal with all its topics can be saved', r.rows[0]?.kind === 'ne
 r = await as(F, `update public.goals set kind = 'mbbs' where user_id = $1`, [F])
 check('goal types are still a fixed list', r.error !== null)
 
+console.log('\nPersonality, language, spicy (migration 13)')
+r = await admin(`select personality, language, spicy, study_mode from public.profiles where id = $1`, [F])
+check('new profiles: sweet, English, not spicy (strictness unchanged)', r[0].personality === 'sweet' && r[0].language === 'en' && r[0].spicy === false && r[0].study_mode === 'easy', JSON.stringify(r[0]))
+r = await as(F, `update public.profiles set personality = 'diva', language = 'hinglish', spicy = true where id = $1 returning personality, language, spicy`, [F])
+check('you can change your own personality, language and spicy', r.rows[0]?.personality === 'diva' && r.rows[0].language === 'hinglish' && r.rows[0].spicy === true, r.error ?? '')
+r = await as(F, `update public.profiles set personality = 'evil' where id = $1`, [F])
+check('only the 4 personalities', r.error?.includes('check'), r.error ?? 'no error')
+r = await as(F, `update public.profiles set language = 'fr' where id = $1`, [F])
+check("only 'en' and 'hinglish'", r.error?.includes('check'), r.error ?? 'no error')
+r = await as(A, `update public.profiles set personality = 'savage' where id = $1 returning id`, [F])
+check("you can't change someone else's personality", r.rows.length === 0 && (await admin(`select personality from public.profiles where id = $1`, [F]))[0].personality === 'diva')
+r = await as(F, `update public.profiles set personality = 'gang', coins = 99999 where id = $1`, [F])
+check('the new grants don\'t open coins', r.error?.includes('permission denied'), r.error ?? 'no error')
+
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {
   console.log('Failed:\n - ' + failures.join('\n - '))
