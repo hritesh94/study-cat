@@ -1,16 +1,44 @@
-# React + Vite
+# Study Cat 🐱
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A Pomodoro study timer with a 3D cat companion.
+Built with React + Vite + React Three Fiber.
 
-Currently, two official plugins are available:
+## Run it
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Then open http://localhost:5173.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## How the code is organized
 
-## Expanding the Oxlint configuration
+```
+src/
+  App.jsx                 the screen: decides what the cat does and when
+  hooks/
+    useTimer.js           study/break countdown (accurate in background tabs)
+    useStudyStats.js      today's study minutes, saved in localStorage
+    useCatVoice.js        speech bubble + browser speech (Web Speech API)
+    useLocalStorage.js    useState that survives page reloads
+  components/
+    Settings.jsx          study/break length inputs
+    BreakPanel.jsx        Play / Feed / Bathe buttons
+  cat/
+    catConfig.js          animation names + settings for a real model
+    Cat.jsx               picks the placeholder or the .glb model
+    PlaceholderCat.jsx    cat made of spheres/cones, posed every frame
+    GlbCat.jsx            loads a real .glb and plays its clips
+    CatScene.jsx          3D canvas, camera and lights
+    useStudyCycle.js      rotates reading → eating → watching while you study
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Swapping in a real cat model
+
+1. Put your model at `public/models/cat.glb`.
+2. In `src/cat/catConfig.js`, set `modelUrl: '/models/cat.glb'`.
+3. Map each app animation (`reading`, `sad`, `play`, ...) to a clip name in your file
+   under `clipNames`. Adjust `scale` / `position` until it sits right.
+
+Nothing else needs to change — the app only ever asks the cat to "play animation X".

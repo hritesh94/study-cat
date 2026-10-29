@@ -156,7 +156,7 @@ export function PlaceholderCat({ animation = 'idle' }) {
 
     P.yarn.position.set(Math.sin(a * 3) * 0.6, 0.3 + Math.abs(Math.sin(a * 6)) * 0.5, 1.0)
     P.yarn.rotation.set(a * 4, a * 3, 0)
-    P.heart.position.y = 2.7 + (a % 1.5) * 0.4
+    P.heart.position.y = 2.2 + (a % 1.5) * 0.5
     P.heart.rotation.y = Math.sin(a * 3) * 0.4
     P.tear.position.y = -0.05 - (a % 1.2) * 0.5
     P.bubbles.children.forEach((b, i) => {
