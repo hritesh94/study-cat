@@ -2,10 +2,10 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, the real room art, and the cat's AI)
+**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, the real room art, the cat's AI, and personalities)
 **Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`, `ai-core`, `adaptive-cat`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is merged and live too. Personalities and the cat learning you (step 22) are on branch `adaptive-cat`, not merged yet
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is merged and live too. Personalities and the cat learning you (step 22) are merged and live too
 
 ---
 
@@ -558,7 +558,7 @@ Tried for real on localhost (chat, a NEET PG goal and its roadmap), then merged 
 6. Type "I feel hopeless" in the chat: a serious reply and the helplines.
 7. Check your usage in Google AI Studio after a day or two: if the free tier is too tight, lower the limits in `game_settings`.
 
-### Step 22 — An adaptive cat: personalities, and the cat learns you · built on branch `adaptive-cat` (not merged or deployed yet)
+### Step 22 — An adaptive cat: personalities, and the cat learns you · built on branch `adaptive-cat`, merged into `main` and deployed
 Commits: `1558f6d` part 1.1 (settings), `0cb61f2` part 1.2–1.4 (lines), `6ea626b` part 1.5–1.6 (picker, voice), `8f63e94` part 2 server (memory, packs), `1f6e2ff` part 2 app (panel, packs).
 
 #### When you're ready to try it (in this order)
@@ -568,7 +568,7 @@ Commits: `1558f6d` part 1.1 (settings), `0cb61f2` part 1.2–1.4 (lines), `6ea62
 2. **Then deploy the functions** (6 now: chat, roadmap, quiz, report, **memory**, **pack**): `npx supabase functions deploy --use-api`.
    Paste first: the new function code reads the new columns, so deploying before pasting would break the chat.
 
-They only add things. The live site keeps working after you paste them (it just doesn't use them yet).
+They only add things. ✅ Both were pasted and the 6 functions deployed on 2026-10-30, tried on localhost (the chat answered, after the backup-model change), then merged into `main` and deployed.
 
 #### Part 1 — Personalities
 1. **Two separate settings now:**
