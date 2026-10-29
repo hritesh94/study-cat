@@ -3,6 +3,7 @@
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
 **Live app:** https://study-cat-pink.vercel.app (the HD cat with the "My Cat" wardrobe, merged into `main` and deployed)
+**Code:** https://github.com/hritesh94/study-cat (public; branches `main` and `game-cat`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90
 **Status:** Phase 1 complete, cozy redesign, and now the game-engine cat (no login, no backend)
 
@@ -216,6 +217,41 @@ Files: `src/game/catItems.js`, `src/components/Wardrobe.jsx` + `.css`, `tools/ma
 - **Testing tool:** `?timerloop` (dev only) makes the game tick on timers instead of animation frames, so tests can run in a hidden browser window. It isn't in production builds.
 - The floor now continues further down, so lifting the room never shows an empty band at the bottom of the screen.
 
+### Step 16 — On GitHub · https://github.com/hritesh94/study-cat
+- **What GitHub is for:** until now every commit lived only on this computer. GitHub keeps a copy online (a backup), lets others read or contribute to the code, and lets Vercel deploy by itself on every push.
+- **Ignore rules first (`.gitignore`):** before anything went online, I made sure these can never be committed:
+  - `.env`, `.env.*` and any `*.local` file (where secret keys will live once Supabase arrives). An optional `.env.example` with no real values is allowed.
+  - `node_modules`, `dist`, `.vercel`, and generator output anywhere under `tools/**/out/`.
+  - I checked each one with `git check-ignore`.
+- **Secrets scan:** I searched all 23 commits on every branch for API keys and tokens (OpenAI/Anthropic, AWS, GitHub, Slack, Google, JWTs, private keys, Supabase/Vercel tokens), for `.env`/key/credential files, and for hard-coded passwords. **Nothing was found.**
+- **Your email is public:** every commit records `hritesh94.4@gmail.com`, and you chose to keep it. To hide it on *future* commits, turn on GitHub's "Keep my email addresses private" and set `git config user.email` to the `…@users.noreply.github.com` address GitHub shows you.
+- **GitHub CLI (`gh`):** installed with `winget install --id GitHub.cli -e`, then logged in with `gh auth login` (GitHub.com → HTTPS → Yes → web browser). The login also lets `git push` use your GitHub account.
+- **The repo:**
+  ```bash
+  gh repo create hritesh94/study-cat --public --source . --remote origin \
+    --description "A cozy Pomodoro study timer with an animated cat (React + Phaser)" \
+    --homepage "https://study-cat-pink.vercel.app"
+  git push -u origin main        # -u: remember origin/main, so later just `git push`
+  git push -u origin game-cat
+  ```
+  `origin` is Git's nickname for the GitHub copy. There was no `phase-2` branch to push.
+- **New README:** a short front page for the repo: what Study Cat is, the live link, cat GIFs from the sprite pack's previews, the tech stack, and how to run it locally.
+
+#### Make Vercel deploy on every push (one-time, in the browser)
+1. Open https://vercel.com, sign in, and open the **study-cat** project (under *hritesh94's projects*).
+2. Go to **Settings → Git** and click **Connect Git Repository**, then choose **GitHub**.
+3. GitHub asks you to install the **Vercel** app. Choose *Only select repositories* → **study-cat**, then **Install**. (Vercel can only see the repos you pick.)
+4. Back in Vercel, pick **hritesh94/study-cat** and confirm. The **Production Branch** should be `main` (the default).
+5. Under **Settings → Build and Deployment**, check that the framework is **Vite** (build `npm run build`, output `dist`). It was detected on the first deploy, so it should already be right.
+
+After that:
+- `git push` to **main** → Vercel builds and updates https://study-cat-pink.vercel.app by itself, in about a minute.
+- A push to **any other branch** (like `game-cat`) → a **preview** deployment with its own link, so you can check a change before merging. Preview links need your Vercel login (Vercel's default protection).
+- Each push also gets a ✓ or ✗ next to it on GitHub, showing whether the build worked.
+- `npx vercel deploy --prod` still works, but isn't needed any more.
+
+(Alternative to steps 2–4, from this folder: `npx vercel git connect`. It links the project to the repo in `origin`, but GitHub still asks you to install the Vercel app the first time.)
+
 ---
 
 ## 3. Project structure
@@ -282,7 +318,8 @@ To reset everything, open the browser console on the site and run `localStorage.
 | `npm run thumbs` | Re-cuts the wardrobe pictures after the sprite sheets change |
 | `git log --oneline` | Shows the commit history |
 | `git status` | Shows what changed since the last commit |
-| `npx vercel deploy --prod` | Publishes the current code to the live URL |
+| `git push` | Sends your commits to GitHub (once Vercel is connected, a push to `main` also deploys) |
+| `npx vercel deploy --prod` | Publishes the current code to the live URL by hand (not needed once Vercel is connected to GitHub) |
 | open `http://localhost:5173/?debug` | The cat debug panel |
 | add `?timerloop` (dev only) | Keeps the game running in a hidden browser window, for automated tests |
 
@@ -342,6 +379,7 @@ To reset everything, open the browser console on the site and run `localStorage.
 - The window's hills and a few room details are still drawn from small rectangles, so up close they have little steps.
 - When locks become real, a saved breed or outfit that's locked will need a fallback (e.g. orange with no outfit). Today nothing is locked, so that can't happen yet.
 - After regenerating the sprite pack, run `npm run thumbs`, or the wardrobe pictures will be out of date.
+- The repo is public, so anything committed is visible to everyone. Keep secrets in `.env.local` (ignored), never in the code.
 - If the browser tab is in the background, the game pauses (browsers stop drawing hidden pages). The timer keeps counting correctly.
 
 ---
