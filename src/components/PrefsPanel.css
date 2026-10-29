@@ -1,0 +1,60 @@
+/* ── ⚙️ Settings sheet (the sheet itself is in Sheet.css) ── */
+.prefs {
+  max-width: 460px;
+  overflow-y: auto;
+}
+
+.prefs-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.prefs-label {
+  font-weight: 500;
+  min-width: 5.5rem;
+}
+
+.prefs-value {
+  min-width: 2.8rem;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* a chunky, hand-drawn looking slider */
+input.volume {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  height: 12px;
+  padding: 0;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  accent-color: var(--orange);
+  cursor: pointer;
+}
+input.volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--orange);
+  border: 2.5px solid var(--ink);
+}
+input.volume::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--orange);
+  border: 2.5px solid var(--ink);
+}
+input.volume:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+input.volume:focus-visible {
+  outline: 3px solid var(--purple);
+  outline-offset: 3px;
+}

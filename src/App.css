@@ -84,6 +84,36 @@ button.icon {
   line-height: 1;
 }
 
+.today {
+  white-space: nowrap;
+}
+
+/* phones: a tighter top bar. The mute button moves into ⚙️ Settings. */
+@media (max-width: 480px) {
+  .topbar {
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+  .topbar h1 {
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+  .topbar-right {
+    gap: 0.35rem;
+  }
+  .topbar button.mute {
+    display: none;
+  }
+  .today {
+    padding: 0.2rem 0.55rem;
+  }
+}
+@media (max-width: 420px) {
+  .today-label {
+    display: none;
+  }
+}
+
 /* ── speech bubble above the cat ── */
 .bubble {
   position: absolute;
@@ -106,6 +136,21 @@ button.icon {
   box-shadow: 3px 4px 0 var(--ink-soft);
   z-index: 3;
   animation: pop 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+/* the part of the line the cat hasn't "said" yet */
+.bubble .untyped {
+  visibility: hidden;
+}
+
+/* read by screen readers, but not shown */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* the tail: an ink triangle with a smaller paper triangle on top */

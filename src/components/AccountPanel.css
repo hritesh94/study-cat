@@ -156,20 +156,10 @@ button.account-button {
   .stat {
     padding: 0.15rem 0.45rem;
   }
-  .topbar.signed-in {
-    padding-left: 0.7rem;
-    padding-right: 0.7rem;
-  }
-  .topbar.signed-in h1 {
-    font-size: 1.1rem;
-    white-space: nowrap;
-  }
-  .topbar.signed-in .topbar-right {
-    gap: 0.35rem;
-  }
 }
 
 button.login-button {
+  white-space: nowrap;
   padding: 0.3rem 0.85rem;
   background: var(--orange);
   font-weight: 600;

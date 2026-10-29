@@ -4,6 +4,8 @@ import { BreakPanel } from './components/BreakPanel'
 import { CoinIcon } from './components/CoinIcon'
 import { CoinPop } from './components/CoinPop'
 import { GameCanvas } from './game/GameCanvas'
+import { lineById, pickLine } from './game/catLines'
+import { PrefsPanel } from './components/PrefsPanel'
 import { Settings } from './components/Settings'
 import { Wardrobe } from './components/Wardrobe'
 import { liveStreak } from './lib/supabase'
@@ -16,11 +18,8 @@ import { useStudyStats } from './hooks/useStudyStats'
 import { formatTime, useTimer } from './hooks/useTimer'
 import './App.css'
 
-const BREAK_LINE = 'Enough studying, play with me!'
-const START_LINES = ["Let's focus!", "Study time! I'll keep you company.", 'You got this!']
-const COME_BACK_LINES = ['Hey! Where did you go?', 'You left me all alone...', 'No sneaking off!']
-const MEOW_LINES = ['Meow!', 'Mrrp?', 'Meow meow!']
-const pick = (lines) => lines[Math.floor(Math.random() * lines.length)]
+// What the cat says lives in src/game/catLines.js.
+const BREAK_LINE = lineById('break.idle.01')
 
 // Browsers only allow fullscreen right after a click, so we call this from
 // the Start button. If it's refused, the focus view still works in the window.
@@ -46,9 +45,9 @@ export default function App() {
     onPhaseChange: (next) => {
       if (next === 'break') {
         exitFullscreen()
-        voice.say(BREAK_LINE)
+        voice.say(pickLine('finish'))
       } else {
-        voice.say("Break's over! Back to work.")
+        voice.say(pickLine('break.end'))
       }
     },
   })
@@ -60,7 +59,7 @@ export default function App() {
   // The event listener below is set up once, so it reads fresh values from this ref.
   const latest = useRef({})
   useEffect(() => {
-    latest.current = { focusing, sad, say: voice.say }
+    latest.current = { focusing, sad, say: voice.say, lineShowing: !!voice.line }
   })
   useEffect(() => {
     let cheerUp
@@ -73,7 +72,7 @@ export default function App() {
         }
       } else if (sad) {
         // You're back: the cat complains, stays sad a moment, then forgives you.
-        say(pick(COME_BACK_LINES))
+        say(pickLine('leave'))
         cheerUp = setTimeout(() => setSad(false), 4000)
       }
     }
@@ -111,25 +110,27 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
+  const prefsRef = useRef(null)
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
+  const prefsButton = useRef(null)
   const openSheet = useRef(null)
   useEffect(() => {
     openSheet.current = sheet
   })
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
-    const from = openSheet.current === 'account' ? accountButton : myCatButton
+    const from = { account: accountButton, prefs: prefsButton }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
   }, [])
   const toggleSheet = (name) => setSheet((open) => (open === name ? null : name))
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef], [])
 
   // ── Study sessions on the server → coins + streak ──
   const [coinPop, setCoinPop] = useState(null)
@@ -144,7 +145,7 @@ export default function App() {
       setCoinPop({ id: Date.now(), coins: r.coins_awarded })
       setCoinBump(true)
       game.current?.celebrate()
-      voice.say(r.coins_awarded > 0 ? `Yay! +${r.coins_awarded} ${r.coins_awarded === 1 ? 'coin' : 'coins'}!` : "That's all the coins for today!")
+      voice.say(pickLine(r.coins_awarded > 0 ? 'coins.earned' : 'coins.cap'))
     },
     onError: (error) => console.warn('[study session]', error.message),
   })
@@ -163,15 +164,28 @@ export default function App() {
 
   // ── Break reactions: Play / Feed / Bathe ──
   const doBreakAction = (action) => {
-    voice.say(action.line)
+    voice.say(pickLine(`react.${action.animation}`))
     game.current?.command(action.animation)
   }
-  const bubble = voice.line ?? (timer.phase === 'break' ? BREAK_LINE : null)
+  const bubble = voice.line ?? (timer.phase === 'break' ? { ...BREAK_LINE, shown: BREAK_LINE.text.length } : null)
+
+  // The first tap anywhere: the cat says hello (sound needs a tap first).
+  const greeted = useRef(false)
+  useEffect(() => {
+    const greet = () => {
+      if (greeted.current) return
+      greeted.current = true
+      // after the tap's own reaction (e.g. Start says its line first)
+      setTimeout(() => !latest.current.lineShowing && latest.current.say(pickLine('greet'), { meow: true }), 250)
+    }
+    window.addEventListener('pointerdown', greet, { once: true })
+    return () => window.removeEventListener('pointerdown', greet)
+  }, [])
 
   const start = () => {
     if (timer.phase === 'study') {
       enterFullscreen()
-      voice.say(pick(START_LINES))
+      voice.say(pickLine('start'))
     }
     timer.start()
   }
@@ -190,7 +204,7 @@ export default function App() {
         onLookChange={setCatLook}
         coverRefs={coverRefs}
         onBusy={setCatBusy}
-        onMeow={() => voice.say(pick(MEOW_LINES))}
+        onMeow={() => voice.say(pickLine('meow'), { meow: true })}
       />
 
       <header className={`topbar${profile ? ' signed-in' : ''}`}>
@@ -217,7 +231,10 @@ export default function App() {
             <span aria-hidden="true">🐱</span>
             <span className="mycat-label"> My Cat</span>
           </button>
-          <span className="today">Today: {todayMinutes} min</span>
+          <span className="today" title="Studied today">
+            <span className="today-label">Today: </span>
+            {todayMinutes} min
+          </span>
           {auth.enabled && auth.ready && (
             <button
               ref={accountButton}
@@ -238,7 +255,7 @@ export default function App() {
           )}
           {voice.canSpeak && (
             <button
-              className="icon"
+              className="icon mute"
               onClick={() => voice.setMuted(!voice.muted)}
               aria-label={voice.muted ? 'Unmute cat' : 'Mute cat'}
               title={voice.muted ? 'Unmute cat' : 'Mute cat'}
@@ -246,17 +263,34 @@ export default function App() {
               {voice.muted ? '🔇' : '🔊'}
             </button>
           )}
+          <button
+            ref={prefsButton}
+            className="icon"
+            onClick={() => toggleSheet('prefs')}
+            aria-expanded={sheet === 'prefs'}
+            aria-label="Settings"
+            title="Settings"
+          >
+            ⚙️
+          </button>
         </div>
       </header>
 
       {bubble && (
-        <div className="bubble" key={bubble}>
-          {bubble}
+        // the whole line is laid out at once (so the bubble doesn't grow
+        // while typing); the not-yet-typed part is just invisible
+        <div className="bubble" key={bubble.turn ?? bubble.id} role="status">
+          <span className="sr-only">{bubble.text}</span>
+          <span aria-hidden="true">
+            {bubble.text.slice(0, bubble.shown)}
+            <span className="untyped">{bubble.text.slice(bubble.shown)}</span>
+          </span>
         </div>
       )}
 
       <CoinPop pop={coinPop} />
 
+      <PrefsPanel ref={prefsRef} open={sheet === 'prefs'} onClose={closeSheet} voice={voice} />
       <Wardrobe ref={wardrobeRef} open={wardrobeOpen} onClose={closeSheet} look={catLook} onChange={setCatLook} />
       {auth.enabled && (
         <AccountPanel

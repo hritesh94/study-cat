@@ -1,43 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { canMakeSound, meow, setMuted as setAudioMuted, setVolume as setAudioVolume, speak, unlockAudio } from '../audio/catVoice'
 import { useLocalStorage } from './useLocalStorage'
 
-const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window
-
-// Pick an English voice once the browser has loaded its voice list.
-function pickVoice() {
-  const voices = window.speechSynthesis.getVoices()
-  return voices.find((v) => v.lang.startsWith('en') && /female|zira|samantha/i.test(v.name))
-    ?? voices.find((v) => v.lang.startsWith('en'))
-}
-
-// say("Hi!") shows a speech bubble for a few seconds and reads it aloud
-// with the browser's built-in Web Speech API (no internet or API key needed).
+// The cat talks: a line types into the speech bubble while the cat babbles
+// it (or plays its recording). Lines come from src/game/catLines.js.
+//
+// say(line) with line = { id, text, mood }; say(line, { meow: true }) plays
+// a real meow sound instead of babble (for clicks and greetings).
 export function useCatVoice() {
   const [muted, setMuted] = useLocalStorage('studycat:muted', false)
-  const [line, setLine] = useState(null)
-  const clearTimer = useRef()
+  const [volume, setVolume] = useLocalStorage('studycat:volume', 0.7)
+  const [line, setLine] = useState(null) // { id, text, mood, turn, shown }
+  const hide = useRef(null)
+  const lastTurn = useRef(0)
 
-  const say = useCallback(
-    (text) => {
-      setLine(text)
-      clearTimeout(clearTimer.current)
-      clearTimer.current = setTimeout(() => setLine(null), 3500)
+  useEffect(() => setAudioMuted(muted), [muted])
+  useEffect(() => setAudioVolume(volume), [volume])
 
-      if (!canSpeak || muted) return
-      window.speechSynthesis.cancel() // stop any line that's still playing
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.voice = pickVoice() ?? null
-      utterance.pitch = 1.7 // higher pitch = more kitten-like
-      utterance.rate = 1.05
-      window.speechSynthesis.speak(utterance)
-    },
-    [muted],
-  )
-
-  useEffect(() => () => clearTimeout(clearTimer.current), [])
+  // sound is only allowed after the first click/tap/key
   useEffect(() => {
-    if (muted && canSpeak) window.speechSynthesis.cancel()
-  }, [muted])
+    const unlock = () => unlockAudio()
+    window.addEventListener('pointerdown', unlock)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
-  return { line, say, muted, setMuted, canSpeak }
+  const say = useCallback((next, { meow: withMeow = false } = {}) => {
+    if (!next) return
+    clearTimeout(hide.current)
+    const turn = (lastTurn.current += 1) // a newer line always wins
+    setLine({ ...next, turn, shown: 0 })
+    const onType = (shown) => setLine((l) => (l?.turn === turn ? { ...l, shown } : l))
+    if (withMeow) meow()
+    const typed = withMeow ? speak({ ...next, id: null }, onType, { silent: true }) : speak(next, onType)
+    // keep it up long enough to read, then clear the bubble
+    typed.then(() => {
+      if (lastTurn.current !== turn) return
+      hide.current = setTimeout(() => setLine((l) => (l?.turn === turn ? null : l)), Math.max(2200, next.text.length * 45))
+    })
+  }, [])
+
+  useEffect(() => () => clearTimeout(hide.current), [])
+
+  return { line, say, muted, setMuted, volume, setVolume, canSpeak: canMakeSound() }
 }

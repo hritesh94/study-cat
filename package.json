@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "thumbs": "node tools/make-thumbs.mjs",
-    "test:db": "node tools/db-test.mjs"
+    "test:db": "node tools/db-test.mjs",
+    "voice:lines": "node scripts/export-lines.mjs",
+    "meows": "node tools/make-meows.mjs"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",

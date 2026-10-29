@@ -1,8 +1,9 @@
 // The three things you can do with the cat during a break.
+// (What the cat says back is in catLines.js: react.play, react.feed, react.bathe.)
 const BREAK_ACTIONS = [
-  { animation: 'play', label: 'Play', emoji: '🧶', line: 'Wheee! Again, again!' },
-  { animation: 'feed', label: 'Feed', emoji: '🐟', line: 'Yum! Thank you!' },
-  { animation: 'bathe', label: 'Bathe', emoji: '🫧', line: 'Brrr... squeaky clean!' },
+  { animation: 'play', label: 'Play', emoji: '🧶' },
+  { animation: 'feed', label: 'Feed', emoji: '🐟' },
+  { animation: 'bathe', label: 'Bathe', emoji: '🫧' },
 ]
 
 export function BreakPanel({ onAction, busy }) {
