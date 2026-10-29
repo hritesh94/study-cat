@@ -11,6 +11,7 @@ import { withAllowance } from '../http.js'
 import { systemPrompt } from '../prompts.js'
 import { generateJson } from '../providers/index.js'
 import { CRISIS_REPLY, detectDistress } from '../safety.js'
+import { voiceProfile } from '../voiceProfile.js'
 import { clip, num, text } from '../validate.js'
 
 const QUESTIONS = 3
@@ -60,7 +61,7 @@ export async function quiz(body, { store, ai }) {
   if (detectDistress(topic)) return { crisis: true, reply: CRISIS_REPLY }
 
   return withAllowance(store, 'quiz', async (usage) => {
-    const [profile, goal] = await Promise.all([store.profile(), store.activeGoal()])
+    const [profile, goal] = await Promise.all([voiceProfile(store), store.activeGoal()])
     const context = [
       goal ? `They're preparing for: ${goal.title} (${goal.kind}).` : 'No exam goal set.',
       subject ? `Subject: ${subject}.` : '',

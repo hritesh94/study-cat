@@ -19,6 +19,9 @@ import { chat, ONBOARDING_HELLO, validGoal } from '../supabase/functions/_shared
 import { availableHours, roadmap } from '../supabase/functions/_shared/handlers/roadmap.js'
 import { quiz, validQuestions } from '../supabase/functions/_shared/handlers/quiz.js'
 import { describeWeek, mondayOf, report } from '../supabase/functions/_shared/handlers/report.js'
+import { memory } from '../supabase/functions/_shared/handlers/memory.js'
+import { pack } from '../supabase/functions/_shared/handlers/pack.js'
+import { cleanMemoryNote, lineProblem } from '../supabase/functions/_shared/lineRules.js'
 import { buildSchedule, dayTarget } from '../src/ai/schedule.js'
 import { NEET_PG } from '../src/data/syllabus/neet-pg.js'
 import { LINES, SAMPLE_LINES, SITUATIONS, lineById, pickLine } from '../src/game/catLines.js'
@@ -497,6 +500,126 @@ console.log('\ncatVoice: personality, language, spicy')
   const serious = systemPrompt({ profile: { personality: 'savage', spicy: true, memory }, task: 'TASK', distress: true })
   check('distress beats personality, spicy and memory', !serious.includes(SAVAGE_AI_STYLE.description) && !serious.includes('AIIMS') && !serious.includes('Spicy is ON') && serious.startsWith(SERIOUS_VOICE))
   check('the safety rules (no slurs, no insults about the person) always come last', systemPrompt({ profile: { personality: 'savage', spicy: true }, task: 'TASK' }).endsWith(SAFETY_RULES) && SAFETY_RULES.includes('no slurs, ever'))
+}
+
+console.log('\nThe cat learns (memory + daily line packs)')
+{
+  const learner = (over = {}) => {
+    const s = fakeStore({ limit: 10, ...over })
+    s.profileRow = { display_name: 'Ana', personality: 'diva', language: 'hinglish', spicy: false, learning: true, current_streak: 3, best_streak: 5, last_study_day: '2026-10-29', ...over.profile }
+    s.profile = async () => s.profileRow
+    s.mem = over.memory ?? null
+    s.memory = async () => s.mem
+    s.chat = over.chat ?? []
+    s.chatSince = async (since) => s.chat.filter((m) => !since || m.created_at > since)
+    s.memorySaves = []
+    s.saveMemory = async (fields) => {
+      s.memorySaves.push(fields)
+      s.mem = { ...(s.mem ?? {}), ...fields }
+      return s.mem
+    }
+    s.packs = over.packs ?? {}
+    s.pack = async (day) => s.packs[day] ?? null
+    s.packSaves = []
+    s.savePack = async (row) => {
+      s.packSaves.push(row)
+      s.packs[row.day] = row
+      return row
+    }
+    return s
+  }
+  const at = (min) => new Date(NOW.getTime() - min * 60000).toISOString()
+  const convo = [
+    { role: 'user', text: 'bhai aaj physics karna hai, NEET PG ke liye', meta: {}, created_at: at(30) },
+    { role: 'cat', text: 'Chalo queen, LOCK IN.', meta: {}, created_at: at(29) },
+    { role: 'user', text: 'reels se distract ho jata hoon raat ko', meta: {}, created_at: at(20) },
+  ]
+  const notes = {
+    goals: 'Clear NEET PG. Wants Physics done this week.',
+    motivates: 'Beating its own streak.',
+    demotivates: 'Long chapters. Her mother keeps calling during study.',
+    talk_style: 'Hinglish, says "bhai" a lot, few emojis.',
+    habits: 'Studies at night; gets distracted by reels. Has anxiety before exams.',
+  }
+
+  // learning off: nothing happens, no AI
+  let s = learner({ profile: { learning: false }, chat: convo })
+  let ai = fakeAi(notes)
+  let out = await memory({}, deps(s, ai))
+  check('learning off: no memory update, no AI call', out.skipped === 'learning_off' && ai.calls.length === 0 && s.memorySaves.length === 0 && s.used === 0)
+  s = learner({ profile: { learning: null }, chat: convo })
+  out = await memory({}, deps(s, fakeAi(notes)))
+  check('not asked yet (learning null) counts as off', out.skipped === 'learning_off' && s.memorySaves.length === 0)
+  s = learner({ profile: { learning: false } })
+  ai = fakeAi({ lines: [] })
+  out = await pack({}, deps(s, ai))
+  check('learning off: no daily pack, no AI call', out.skipped === 'learning_off' && ai.calls.length === 0 && s.packSaves.length === 0)
+
+  // a conversation that's still going
+  s = learner({ chat: [...convo, { role: 'user', text: 'ok', meta: {}, created_at: at(3) }] })
+  ai = fakeAi(notes)
+  out = await memory({}, deps(s, ai))
+  check('a conversation is only learned from after 10 quiet minutes', out.skipped === 'conversation_not_over' && out.retryInMs > 6 * 60000 && ai.calls.length === 0)
+
+  // a finished conversation: one AI call, clean notes
+  s = learner({ chat: convo, memory: { goals: 'NEET PG', processed_until: null } })
+  ai = fakeAi(notes)
+  out = await memory({}, deps(s, ai))
+  const saved = s.memorySaves[0]
+  check('after the conversation: notes updated, as 1 AI call', out.updated && ai.calls.length === 1 && s.used === 1)
+  check('the conversation and the old notes go to the AI', ai.calls[0].messages[0].text.includes('reels se distract') && ai.calls[0].system.includes('NEET PG'))
+  check('study things are kept (incl. "bhai" as talk style)', saved.goals.includes('NEET PG') && saved.talk_style.includes('bhai') && saved.habits.includes('reels'))
+  check('family and health details are dropped, even if the AI wrote them', !saved.demotivates.includes('mother') && saved.demotivates.includes('Long chapters') && !saved.habits.includes('anxiety'), JSON.stringify(saved))
+  check('it remembers how far it read', saved.processed_until === convo.at(-1).created_at)
+  ai = fakeAi(notes)
+  out = await memory({}, deps(s, ai))
+  check('nothing new since: no AI call', out.skipped === 'nothing_new' && ai.calls.length === 0)
+
+  // distress: never learned from
+  s = learner({ chat: [{ role: 'user', text: 'i feel hopeless', meta: { crisis: true }, created_at: at(40) }, { role: 'cat', text: "I'm glad you told me.", meta: { crisis: true }, created_at: at(39) }] })
+  ai = fakeAi(notes)
+  out = await memory({}, deps(s, ai))
+  check('nothing is learned from a distress conversation', out.skipped === 'not_from_this_conversation' && ai.calls.length === 0 && !s.mem.goals)
+  s = learner({ chat: convo, used: 10 })
+  check('memory updates have their own daily limit', (await throwsCode(() => memory({}, deps(s, fakeAi(notes))), 'limit')) === true)
+
+  // note cleaning
+  check('cleanMemoryNote: keeps short study notes', cleanMemoryNote('Studies best in the morning.') === 'Studies best in the morning.')
+  check('cleanMemoryNote: drops location, contact and relationship sentences', cleanMemoryNote('Lives in Pune. Revises with flashcards. Her boyfriend distracts her. Email is a@b.com.') === 'Revises with flashcards.')
+  check('cleanMemoryNote: medical study words are fine (NEET PG)', cleanMemoryNote('Finds Medicine and infectious disease chapters hard.').includes('Medicine'))
+  check('cleanMemoryNote: at most 300 characters', cleanMemoryNote('Reads a lot. '.repeat(40)).length <= 300)
+
+  // daily packs
+  const good = SITUATIONS.flatMap((situation) => [1, 2, 3].map((i) => ({ situation, mood: 'happy', text: situation === 'streak_milestone' ? `{n} din! Queen energy ${i}.` : `Fresh ${situation} line ${i}, chalo padhte hain.` })))
+  const bad = [
+    { situation: 'greet', mood: 'happy', text: 'x'.repeat(121) },
+    { situation: 'dance', mood: 'happy', text: 'Not a situation.' },
+    { situation: 'leave', mood: 'annoyed', text: 'Get your ass back here.' },
+    { situation: 'leave', mood: 'annoyed', text: "You're so stupid for leaving." },
+    { situation: 'greet', mood: 'happy', text: 'Hey chutiya, study.' },
+    { situation: 'greet', mood: 'happy', text: 'Day {n} of greeting you.' },
+  ]
+  s = learner({ memory: { talk_style: 'Hinglish, says bhai' } })
+  ai = fakeAi({ lines: [...good, ...bad] })
+  out = await pack({ timeZone: 'Asia/Kolkata' }, deps(s, ai))
+  const lines = s.packSaves[0].lines
+  check('a pack: 1 AI call, in their personality, language and memory', ai.calls.length === 1 && ai.calls[0].system.includes(DIVA_AI_STYLE.description) && ai.calls[0].system.includes('Talk in Hinglish') && ai.calls[0].system.includes('says bhai'))
+  check('…with the study numbers from code', ai.calls[0].system.includes('Their study lately'))
+  check('pack lines are checked: only the 36 good ones are kept', lines.length === good.length, String(lines.length))
+  check('…no line over 120 characters, no unknown situation', lines.every((l) => l.text.length <= 120 && SITUATIONS.includes(l.situation)))
+  check('…no swearing when spicy is off, no insults about the person, no slurs', !lines.some((l) => /ass|stupid|chutiya/i.test(l.text)))
+  check('…{n} only in streak milestones', lines.filter((l) => l.text.includes('{n}')).every((l) => l.situation === 'streak_milestone'))
+  check("the pack is saved for today (the student's day)", s.packSaves[0].day === '2026-10-30' && s.packSaves[0].personality === 'diva' && s.packSaves[0].language === 'hinglish')
+  ai = fakeAi('x')
+  out = await pack({ timeZone: 'Asia/Kolkata' }, deps(s, ai))
+  check('once a day: the second open gets the same pack, no AI', out.cached === true && ai.calls.length === 0)
+  s = learner({ profile: { spicy: true } })
+  ai = fakeAi({ lines: [...good, { situation: 'leave', mood: 'annoyed', text: 'Get your ass back here.' }, { situation: 'leave', mood: 'annoyed', text: 'Get back here, you idiot.' }] })
+  await pack({}, deps(s, ai))
+  check('spicy on: swearing allowed, insults about the person still not', s.packSaves[0].lines.some((l) => l.text.includes('ass')) && !s.packSaves[0].lines.some((l) => l.text.includes('idiot')))
+  s = learner()
+  check('too few good lines → bad_output (and the call is given back)', (await throwsCode(() => pack({}, deps(s, fakeAi({ lines: good.slice(0, 5) }))), 'bad_output')) === true && s.used === 0)
+  check('lineProblem: slurs are never allowed, even spicy', lineProblem('you retard', { spicy: true }) === 'banned word')
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`)

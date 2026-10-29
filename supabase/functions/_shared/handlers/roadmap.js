@@ -11,6 +11,7 @@ import { withAllowance } from '../http.js'
 import { systemPrompt } from '../prompts.js'
 import { generateJson } from '../providers/index.js'
 import { addDays, daysBetween, localDayIn, weekday } from '../stats.js'
+import { voiceProfile } from '../voiceProfile.js'
 import { clip, image as validImage, isUuid, num, oneOf, text, timeZone as validTimeZone } from '../validate.js'
 
 const PRIORITIES = ['high', 'medium', 'low']
@@ -172,7 +173,7 @@ export async function roadmap(body, { store, ai, now }) {
   if (!goal.chapters && !syllabusText && !photo && !goal.notes) throw new AiError('bad_input', 'Describe the goal or add its syllabus')
 
   return withAllowance(store, 'roadmap', async (usage) => {
-    const [profile, settings] = await Promise.all([store.profile(), store.settings()])
+    const [profile, settings] = await Promise.all([voiceProfile(store), store.settings()])
     const days = daysBetween(today, goal.deadline)
     const available = availableHours(goal, today, settings.goal_light_day_pct)
     const done = new Set(goal.done_chapters ?? [])

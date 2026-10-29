@@ -38,6 +38,8 @@ export const OUTPUT = {
   roadmap: { maxTokens: 12000, timeoutMs: 55000 },
   quiz: { maxTokens: 3000, timeoutMs: 25000 },
   report: { maxTokens: 2000, maxChars: 700, timeoutMs: 20000 },
+  memory: { maxTokens: 1500, timeoutMs: 20000 },
+  pack: { maxTokens: 6000, timeoutMs: 45000 },
 }
 
 export const CHAT = {
