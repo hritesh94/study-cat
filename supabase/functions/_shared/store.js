@@ -14,6 +14,7 @@ export function makeStore({ db, admin, userId }) {
     reserve: async (kind) => must(await admin.rpc('ai_reserve', { p_user: userId, p_kind: kind })),
     release: async (kind) => must(await admin.rpc('ai_release', { p_user: userId, p_kind: kind })),
 
+    settings: async () => must(await db.from('game_settings').select('*').single()),
     profile: async () => must(await db.from('profiles').select('display_name, current_streak, best_streak, last_study_day, study_mode').eq('id', userId).single()),
     activeGoal: async () => must(await db.from('goals').select('*').eq('active', true).maybeSingle()),
     goal: async (id) => must(await db.from('goals').select('*').eq('id', id).maybeSingle()),
@@ -33,5 +34,7 @@ export function makeStore({ db, admin, userId }) {
     chatHistory: async (n) =>
       must(await db.from('chat_messages').select('role, text, meta, created_at').order('created_at', { ascending: false }).limit(n)).reverse(),
     saveChat: async (rows) => must(await admin.from('chat_messages').insert(rows.map((r) => ({ ...r, user_id: userId })))),
+    saveRoadmap: async (goalId, plan) =>
+      must(await admin.from('roadmaps').insert({ user_id: userId, goal_id: goalId, plan }).select('id, goal_id, plan, created_at').single()),
   }
 }

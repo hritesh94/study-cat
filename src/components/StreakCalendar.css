@@ -126,6 +126,15 @@ button.calendar-day {
   font-size: 0.75rem;
   line-height: 1;
 }
+/* the daily goal from your roadmap was reached */
+.calendar-crown {
+  position: absolute;
+  top: -0.6rem;
+  left: -0.25rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  transform: rotate(-12deg);
+}
 
 .calendar-legend {
   display: flex;

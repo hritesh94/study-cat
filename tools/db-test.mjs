@@ -10,6 +10,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dayTarget } from '../src/ai/schedule.js'
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations')
 const db = await PGlite.create()
@@ -396,6 +397,82 @@ r = await as(A, `select id from public.goals`)
 check('Ana sees only her goal', r.rows.length === 1 && r.rows[0].id === goalA)
 r = await as(A, `update public.goals set user_id = $2 where id = $1`, [goalA, B])
 check("a goal can't be moved to someone else", r.error?.includes('permission denied'), r.error ?? 'no error')
+
+console.log('\nRoadmaps (migration 9)')
+r = await as(A, `insert into public.roadmaps (user_id, goal_id, plan) values ($1, $2, '{}') returning id`, [A, goalA])
+check("users can't write roadmaps (only the roadmap function)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await asService(`insert into public.roadmaps (user_id, goal_id, plan) values ($1, $2, $3) returning id`, [A, goalA, JSON.stringify({ chapters: [] })])
+check('the roadmap function saves a roadmap', r.rows.length === 1, r.error ?? '')
+check('Ana reads her roadmap', (await as(A, `select id from public.roadmaps`)).rows.length === 1)
+check("Ben can't read Ana's roadmap", (await as(B, `select id from public.roadmaps`)).rows.length === 0)
+
+console.log('\nDaily goal bonus (+15, once a day, inside the daily cap)')
+const D = '44444444-4444-4444-4444-444444444444'
+await admin(`insert into auth.users (id, email) values ($1, 'dee@example.com')`, [D])
+const claim = async (uid, day = today) => (await as(uid, `select public.claim_daily_goal($1) as r`, [day])).rows[0]?.r
+const coinsOf = async (uid) => (await admin(`select coins from public.profiles where id = $1`, [uid]))[0].coins
+check('no goal → nothing to claim', (await claim(D))?.reason === 'no_goal')
+const dow = (await admin(`select extract(dow from $1::date)::int as d`, [today]))[0].d
+r = await as(D, `insert into public.goals (kind, title, deadline, hours_per_day, light_weekday) values ('custom', 'Spanish', $1, 1, $2) returning id`, [
+  await utcDay(60),
+  (dow + 1) % 7, // the lighter day is tomorrow, so today's target is the full hour
+])
+const goalD = r.rows[0]?.id
+await session(D, 30, 30, today)
+let c = await claim(D)
+check('30 of 60 minutes: not yet', c?.hit === false && c.minutes === 30 && c.target === 60, JSON.stringify(c))
+await session(D, 30, 30, today)
+const beforeBonus = await coinsOf(D)
+c = await claim(D)
+check('60 of 60 minutes: +15 coins', c?.hit === true && c.coins_awarded === 15 && (await coinsOf(D)) === beforeBonus + 15, JSON.stringify(c))
+c = await claim(D)
+check('only once a day', c?.hit === true && c.already === true && c.coins_awarded === 0 && (await coinsOf(D)) === beforeBonus + 15)
+r = await as(D, `select kind, coins from public.bonus_coins`)
+check('Dee sees her bonus', r.rows.length === 1 && r.rows[0].coins === 15)
+check("Ana doesn't see Dee's bonus", (await as(A, `select id from public.bonus_coins`)).rows.length === 0)
+r = await as(D, `insert into public.bonus_coins (user_id, day, kind, coins) values ($1, $2, 'quiz', 500)`, [D, today])
+check("users can't give themselves bonus coins", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(D, `select * from public.daily_totals($1, $1)`, [today])
+check('daily_totals: the 👑 and the bonus in the day\'s coins', r.rows[0]?.goal_hit === true && r.rows[0].coins === beforeBonus + 15, JSON.stringify(r.rows))
+r = await as(A, `select * from public.daily_totals($1, $1)`, [today])
+check('no crown on a day without the bonus', r.rows[0]?.goal_hit === false, JSON.stringify(r.rows))
+
+// bonus coins count toward the daily cap, for sessions too
+const dayCoins = beforeBonus + 15
+await admin(`update public.game_settings set daily_coin_cap = $1`, [dayCoins + 5])
+const capped = await session(D, 20, 20, today)
+check('bonus coins count toward the daily cap (a 20-minute session gets only 5)', capped.coins_awarded === 5 && capped.capped === true, JSON.stringify(capped))
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+
+const E = '55555555-5555-5555-5555-555555555555'
+await admin(`insert into auth.users (id, email) values ($1, 'eve@example.com')`, [E])
+await as(E, `insert into public.goals (kind, title, deadline, hours_per_day, light_weekday) values ('custom', 'x', $1, 0.5, $2)`, [await utcDay(30), (dow + 1) % 7])
+await admin(`update public.game_settings set daily_coin_cap = 34`) // a 25-minute session earns 25 + 10
+await session(E, 25, 25, today)
+await session(E, 5, 5, today)
+c = await claim(E)
+check('the bonus itself stops at the daily cap', c?.hit === true && c.coins_awarded === 0 && c.capped === true, JSON.stringify(c))
+await admin(`update public.game_settings set daily_coin_cap = 300`)
+r = await as(E, `select * from public.daily_totals($1, $1)`, [today])
+check('…but the day still gets its crown', r.rows[0]?.goal_hit === true)
+
+// the server's daily target is the same as the app's (src/ai/schedule.js)
+const targets = []
+for (const [hours, light] of [[6, dow], [6, (dow + 3) % 7], [0.5, dow], [2.5, dow], [7.25, (dow + 1) % 7], [16, dow]]) {
+  await admin(`update public.goals set hours_per_day = $2, light_weekday = $3 where id = $1`, [goalD, hours, light])
+  const sql = (await admin(`select public._goal_target(g, $2::date) as t from public.goals g where g.id = $1`, [goalD, today]))[0].t
+  const js = dayTarget({ hours_per_day: hours, light_weekday: light }, today, { goal_light_day_pct: 50, streak_min_minutes: 25 })
+  targets.push(`${hours}h:${sql}/${js}`)
+  if (sql !== js) check(`target for ${hours} h (light day ${light === dow})`, false, `SQL ${sql}, app ${js}`)
+}
+check('the daily target is the same in SQL and in the app (incl. the lighter day)', targets.every((t) => t.split(':')[1].split('/')[0] === t.split('/')[1]), targets.join(' '))
+
+await admin(`update public.goals set deadline = $2 where id = $1`, [goalD, await utcDay(-1)])
+check('no bonus after the deadline', (await claim(D))?.reason === 'after_deadline')
+r = await as(D, `select public._day_coins($1, $2)`, [D, today])
+check("users can't call the helper functions", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(null, `select public.claim_daily_goal($1)`, [today])
+check("logged-out visitors can't claim", r.error?.includes('permission denied'), r.error ?? 'no error')
 
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {

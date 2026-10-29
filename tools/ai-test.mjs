@@ -15,6 +15,8 @@ import { detectDistress } from '../supabase/functions/_shared/safety.js'
 import { studyStats } from '../supabase/functions/_shared/stats.js'
 import { image, text } from '../supabase/functions/_shared/validate.js'
 import { chat, ONBOARDING_HELLO, validGoal } from '../supabase/functions/_shared/handlers/chat.js'
+import { availableHours, roadmap } from '../supabase/functions/_shared/handlers/roadmap.js'
+import { buildSchedule, dayTarget } from '../src/ai/schedule.js'
 
 let passed = 0
 const failures = []
@@ -225,6 +227,102 @@ console.log('\nChat')
 }
 
 // ── more sections are added below by later parts ──
+
+console.log('\nRoadmap (the AI plans the big picture)')
+{
+  const chapters = [
+    { id: 'a', subject: 'Physics', name: 'Optics', weight: 'high' },
+    { id: 'b', subject: 'Physics', name: 'Gravitation', weight: 'medium' },
+    { id: 'c', subject: 'Chemistry', name: 'Equilibrium', weight: 'high' },
+    { id: 'd', subject: 'Chemistry', name: 'Solutions', weight: 'low' },
+  ]
+  const goal = { id: '11111111-2222-3333-4444-555555555555', kind: 'neet', title: 'NEET UG 2027', deadline: '2026-12-29', hours_per_day: 2, light_weekday: 0, subjects: [{ name: 'Physics', level: 'weak' }], chapters, done_chapters: ['d'] }
+  const answer = {
+    chapters: [
+      { id: 'c', name: 'Made-up name', subject: 'X', hours: 10, priority: 'high' },
+      { id: 'zzz', name: 'Not in the syllabus', subject: 'Physics', hours: 5, priority: 'low' },
+      { id: 'c', name: 'Equilibrium again', subject: 'Chemistry', hours: 3, priority: 'high' },
+      { id: 'd', name: 'Already done', subject: 'Chemistry', hours: 3, priority: 'low' },
+      { id: 'a', name: 'Optics', subject: 'Physics', hours: 999, priority: 'high' },
+    ],
+    phases: [
+      { kind: 'learn', share: 7, note: 'new chapters' },
+      { kind: 'revise', share: 2, note: '' },
+      { kind: 'mock', share: 1, note: '' },
+    ],
+    milestones: [{ week: 2, text: 'Optics done' }, { week: 1, text: 'Equilibrium done' }, { week: 99, text: 'far away' }],
+    feasibility: { verdict: 'comfortable', message: 'Easy peasy!' },
+  }
+  const store = fakeStore({ goal })
+  store.settings = async () => ({ goal_light_day_pct: 50 })
+  store.saveRoadmap = async (goalId, plan) => ({ id: 'r1', goal_id: goalId, plan, created_at: '2026-10-30T10:00:00Z' })
+  const ai = fakeAi(answer)
+  const out = await roadmap({ goalId: goal.id, timeZone: 'Asia/Kolkata' }, deps(store, ai))
+  const plan = out.roadmap.plan
+  const ids = plan.chapters.map((c) => c.id)
+  check('the prompt lists the syllabus chapters still to study (not done ones)', ai.calls[0].system.includes('c | Chemistry | Equilibrium | high') && !ai.calls[0].system.includes('d | Chemistry'))
+  check('the prompt says how many hours there really are', /about \d+ hours in total/.test(ai.calls[0].system))
+  check('unknown ids, repeats and done chapters from the AI are dropped', ids.join(',') === 'd,c,a,b', ids.join(','))
+  check('names come from the syllabus, not the AI', plan.chapters.find((c) => c.id === 'c').name === 'Equilibrium')
+  check('a chapter the AI forgot is added at the end', plan.chapters.at(-1).id === 'b' && plan.chapters.at(-1).added)
+  check('hours are kept sensible (999 → 80)', plan.chapters.find((c) => c.id === 'a').hours === 80)
+  check('phase shares add up to 1', Math.abs(plan.phases.reduce((s, p) => s + p.share, 0) - 1) < 0.02 && plan.phases[0].share === 0.7)
+  check('milestones are sorted and inside the time left', plan.milestones.map((m) => m.week).join(',') === '1,2,9', plan.milestones.map((m) => m.week).join(','))
+  check('feasibility is honest: the code overrules "comfortable"', plan.feasibility.verdict !== 'comfortable' && plan.feasibility.message.includes(`${plan.feasibility.needed_hours} hours`), JSON.stringify(plan.feasibility))
+  check('the roadmap is saved and returned', out.roadmap.id === 'r1' && out.usage.used === 1)
+
+  const custom = { id: '99999999-2222-3333-4444-555555555555', kind: 'custom', title: 'Spanish B1', deadline: '2027-03-01', hours_per_day: 1, light_weekday: 6, subjects: [], chapters: null, done_chapters: [], notes: 'Pass the B1 exam' }
+  const store2 = fakeStore({ goal: custom })
+  store2.settings = async () => ({ goal_light_day_pct: 50 })
+  store2.saveRoadmap = async (goalId, plan) => ({ id: 'r2', goal_id: goalId, plan, created_at: '2026-10-30T10:00:00Z' })
+  const ai2 = fakeAi({ chapters: [{ id: 'x', name: 'Past tenses', subject: 'Grammar', hours: 6, priority: 'high' }, { id: 'y', name: '', subject: '', hours: 1, priority: 'low' }], phases: [], milestones: [], feasibility: { verdict: 'comfortable', message: 'You can do this!' } })
+  const out2 = await roadmap({ goalId: custom.id, syllabusText: 'Unit 1: past tenses', image: { mimeType: 'image/jpeg', data: 'AAAA' } }, deps(store2, ai2))
+  check('custom goals: the pasted syllabus and the photo go to the AI', ai2.calls[0].messages[0].text.includes('Unit 1: past tenses') && ai2.calls[0].messages[0].images[0].mimeType === 'image/jpeg')
+  check('custom goals: chapters come from the AI, with our own ids', out2.roadmap.plan.chapters.length === 1 && out2.roadmap.plan.chapters[0].id === 'c1')
+  check('no phases from the AI → sensible defaults', out2.roadmap.plan.phases.map((p) => p.share).join(',') === '0.7,0.2,0.1')
+  check('a plan with no chapters is refused (and the call given back)', (await throwsCode(() => roadmap({ goalId: custom.id }, deps(Object.assign(fakeStore({ goal: custom }), { settings: async () => ({ goal_light_day_pct: 50 }) }), fakeAi({ chapters: [], phases: [], milestones: [], feasibility: {} }))), 'bad_output')) === true)
+  check("someone else's goal (or none) → not_found", (await throwsCode(() => roadmap({ goalId: '00000000-0000-0000-0000-000000000000' }, deps(fakeStore({ goal }), fakeAi('x'))), 'not_found')) === true)
+  check('a deadline in the past → bad_input', (await throwsCode(() => roadmap({ goalId: goal.id }, deps(fakeStore({ goal: { ...goal, deadline: '2026-10-01' } }), fakeAi('x'))), 'bad_input')) === true)
+  check('3 roadmaps a day: the 4th is refused before the AI', (await throwsCode(() => roadmap({ goalId: goal.id }, deps(fakeStore({ goal, limit: 3, used: 3 }), fakeAi('x'))), 'limit')) === true)
+  check('a photo over 5 MB is refused', (await throwsCode(() => roadmap({ goalId: custom.id, image: { mimeType: 'image/jpeg', data: 'A'.repeat(7_000_000) } }, deps(fakeStore({ goal: custom }), fakeAi('x'))), 'too_big')) === true)
+  check('availableHours: one lighter day a week', availableHours({ deadline: '2026-11-06', hours_per_day: 2, light_weekday: 0 }, '2026-10-30', 50) === 13)
+}
+
+console.log('\nThe schedule (plain code, no AI)')
+{
+  const rules = { goal_light_day_pct: 50, streak_min_minutes: 25 }
+  const goal = { deadline: '2026-12-29', hours_per_day: 4, light_weekday: 0, done_chapters: [] }
+  check('daily target = hours per day', dayTarget(goal, '2026-10-30', rules) === 240)
+  check('the lighter day (Sunday here) is half', dayTarget(goal, '2026-11-01', rules) === 120)
+  check('never under the streak minutes', dayTarget({ ...goal, hours_per_day: 0.5 }, '2026-11-01', rules) === 25)
+  const plan = {
+    chapters: [
+      { id: 'a', name: 'Optics', subject: 'Physics', hours: 10 },
+      { id: 'b', name: 'Equilibrium', subject: 'Chemistry', hours: 6 },
+      { id: 'c', name: 'Cells', subject: 'Biology', hours: 4 },
+    ],
+    phases: [
+      { kind: 'learn', share: 0.7 },
+      { kind: 'revise', share: 0.2 },
+      { kind: 'mock', share: 0.1 },
+    ],
+  }
+  const s = buildSchedule({ goal, plan, today: '2026-10-30', rules })
+  check('one day per day until the day before the deadline', s.days.length === 60 && s.days.at(-1).day === '2026-12-28')
+  check("today's plan: the first chapter, all of today's minutes", s.today.chapters[0].id === 'a' && s.today.chapters[0].minutes === 240)
+  // Optics is 600 min: 240 today, 240 tomorrow, the last 120 on Sunday (the lighter day), then Equilibrium
+  check('a big chapter carries on the next day', s.days[1].chapters[0].id === 'a' && s.days[2].chapters.map((c) => `${c.id}${c.minutes}`).join(',') === 'a120' && s.days[3].chapters[0].id === 'b', JSON.stringify(s.days[2].chapters))
+  check('the lighter day gets less', s.days[2].target === 120 && s.days[2].light)
+  check('buffer days before revision, then revision and mock tests at the end', s.days.some((d) => d.phase === 'buffer' && d.chapters.length === 0) && s.days.at(-1).phase === 'mock' && s.days.filter((d) => d.phase === 'revise').length > 0)
+  check('everything fits: not behind', !s.behind && s.progress.total === 3)
+  const missed = buildSchedule({ goal, plan, today: '2026-10-31', rules })
+  check('a missed day moves its chapters forward (nothing is lost)', missed.today.chapters[0].id === 'a' && missed.days.length === 59 && !missed.behind)
+  const done = buildSchedule({ goal: { ...goal, done_chapters: ['a'] }, plan, today: '2026-10-30', rules })
+  check('ticked-off chapters are skipped', done.today.chapters[0].id === 'b' && done.progress.done === 1 && done.progress.pct === 33)
+  const tooMuch = buildSchedule({ goal: { ...goal, deadline: '2026-11-04' }, plan, today: '2026-10-30', rules })
+  check("too much for the time left: the rest is listed as not fitting", tooMuch.behind && tooMuch.unscheduled.length > 0)
+  check('after the deadline: no days', buildSchedule({ goal: { ...goal, deadline: '2026-10-30' }, plan, today: '2026-10-30', rules }).days.length === 0)
+}
 
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {

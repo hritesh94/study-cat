@@ -1,0 +1,172 @@
+/* ── Your roadmap ── */
+.roadmap-panel {
+  max-height: min(78vh, 640px);
+}
+.roadmap-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+.roadmap-countdown {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.roadmap-countdown strong {
+  font-size: 1.6rem;
+  color: var(--orange-dark);
+}
+.roadmap-small {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.roadmap-progress {
+  height: 0.8rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.roadmap-progress span {
+  display: block;
+  height: 100%;
+  background: var(--sage);
+  transition: width 0.4s;
+}
+
+.roadmap-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 0.92rem;
+}
+.roadmap-verdict.comfortable strong {
+  color: #4e7a4f;
+}
+.roadmap-verdict.tight strong {
+  color: var(--orange-dark);
+}
+.roadmap-verdict.not_enough_time strong {
+  color: #b4473c;
+}
+
+.roadmap-today h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+.roadmap-today ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.92rem;
+}
+.roadmap-behind {
+  margin: 0;
+  color: #b4473c;
+  font-size: 0.88rem;
+}
+
+.roadmap-section summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.roadmap-milestones {
+  margin: 0.3rem 0 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.roadmap-milestones span {
+  display: inline-block;
+  min-width: 4.2rem;
+  color: var(--muted);
+}
+.roadmap-milestones li.now {
+  font-weight: 600;
+}
+.roadmap-milestones li.now span {
+  color: var(--orange-dark);
+}
+.roadmap-milestones li.past {
+  opacity: 0.6;
+}
+
+.roadmap-chapters {
+  border: 0;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.roadmap-chapters legend {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0;
+}
+.roadmap-chapters label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.roadmap-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.roadmap-empty p {
+  margin: 0;
+}
+.roadmap-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── the daily goal ring in the top bar ── */
+.goal-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.3rem;
+  font-size: 0.85rem;
+}
+.goal-ring svg {
+  width: 1.6rem;
+  height: 1.6rem;
+  transform: rotate(-90deg);
+}
+.goal-ring circle {
+  fill: none;
+  stroke-width: 4;
+}
+.goal-ring .track {
+  stroke: var(--ink-soft);
+}
+.goal-ring .fill {
+  stroke: var(--sage);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s;
+}
+.goal-ring.done .fill {
+  stroke: var(--orange);
+}
+@media (max-width: 600px) {
+  .goal-ring-text {
+    display: none;
+  }
+  .goal-ring {
+    padding: 0.2rem 0.3rem;
+  }
+}

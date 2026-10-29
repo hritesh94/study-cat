@@ -104,6 +104,7 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
             if (!d) return <span key={`blank-${w}-${i}`} className="calendar-blank" />
             const minutes = minutesOf(d)
             const streakDay = isStreakDay(d)
+            const crown = days[d]?.goal_hit // hit the daily goal from your roadmap
             const classes = [
               'calendar-day',
               `level-${levelFor(minutes)}`,
@@ -121,12 +122,17 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
                 disabled={d > today}
                 onClick={() => setPicked(d)}
                 aria-pressed={d === picked}
-                aria-label={`${dayName(d)}: ${minutes} minutes${streakDay ? ', streak day' : ''}`}
+                aria-label={`${dayName(d)}: ${minutes} minutes${streakDay ? ', streak day' : ''}${crown ? ', daily goal reached' : ''}`}
               >
                 <span className="calendar-num">{Number(d.slice(8))}</span>
                 {streakDay && (
                   <span className="calendar-flame" aria-hidden="true">
                     🔥
+                  </span>
+                )}
+                {crown && (
+                  <span className="calendar-crown" aria-hidden="true">
+                    👑
                   </span>
                 )}
               </button>
@@ -155,6 +161,7 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
             <>
               <p className="calendar-detail-stats">
                 <strong>{detail.minutes} min</strong>
+                {detail.goal_hit && <span>👑 daily goal</span>}
                 {detail.sessions !== undefined && (
                   <span>
                     {detail.sessions} {detail.sessions === 1 ? 'session' : 'sessions'}

@@ -5,7 +5,8 @@ import './SubjectPicker.css'
 
 // "What are you studying?" Shown when a study session starts. The last
 // subject is already picked, so it's usually just one tap on Start.
-export function SubjectPicker({ ref, open, onClose, subjects, preselected, onAdd, onStart }) {
+// hint: e.g. "Next on your roadmap: Optics" (its subject is preselected)
+export function SubjectPicker({ ref, open, onClose, subjects, preselected, hint, onAdd, onStart }) {
   const [picked, setPicked] = useState(undefined) // undefined = the preselected one
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -57,6 +58,7 @@ export function SubjectPicker({ ref, open, onClose, subjects, preselected, onAdd
           ×
         </button>
       </header>
+      {hint && <p className="subject-hint">{hint}</p>}
 
       <div className="subject-list" role="radiogroup" aria-label="Subject">
         {subjects.map((s) => (

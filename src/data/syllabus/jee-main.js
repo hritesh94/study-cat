@@ -1,0 +1,77 @@
+// JEE Main (Paper 1, B.E./B.Tech) syllabus: the units of the official NTA
+// syllabus, with a ROUGH weightage (high / medium / low) from past papers,
+// not official.
+//
+// ⚠️ Double-check against the official syllabus PDF on jeemain.nta.nic.in
+// before relying on it.
+export const JEE_MAIN = {
+  id: 'jee_main',
+  name: 'JEE Main',
+  lastChecked: '2026-10-30',
+  sources: [
+    'NTA, JEE Main 2026 syllabus PDF (jeemain.nta.nic.in), unchanged from the reduced 2024 syllabus',
+    'Careers360, "JEE Main Syllabus 2026" (engineering.careers360.com/articles/jee-main-syllabus-2026)',
+  ],
+  subjects: ['Physics', 'Chemistry', 'Maths'],
+  chapters: [
+    // ── Physics (20 units) ──
+    { id: 'phy-measurement', subject: 'Physics', name: 'Units and Measurements', weight: 'low' },
+    { id: 'phy-kinematics', subject: 'Physics', name: 'Kinematics', weight: 'medium' },
+    { id: 'phy-laws-of-motion', subject: 'Physics', name: 'Laws of Motion', weight: 'medium' },
+    { id: 'phy-work-energy', subject: 'Physics', name: 'Work, Energy and Power', weight: 'medium' },
+    { id: 'phy-rotational', subject: 'Physics', name: 'Rotational Motion', weight: 'high' },
+    { id: 'phy-gravitation', subject: 'Physics', name: 'Gravitation', weight: 'medium' },
+    { id: 'phy-solids-liquids', subject: 'Physics', name: 'Properties of Solids and Liquids', weight: 'medium' },
+    { id: 'phy-thermodynamics', subject: 'Physics', name: 'Thermodynamics', weight: 'medium' },
+    { id: 'phy-kinetic-theory', subject: 'Physics', name: 'Kinetic Theory of Gases', weight: 'low' },
+    { id: 'phy-oscillations-waves', subject: 'Physics', name: 'Oscillations and Waves', weight: 'medium' },
+    { id: 'phy-electrostatics', subject: 'Physics', name: 'Electrostatics', weight: 'high' },
+    { id: 'phy-current', subject: 'Physics', name: 'Current Electricity', weight: 'high' },
+    { id: 'phy-magnetism', subject: 'Physics', name: 'Magnetic Effects of Current and Magnetism', weight: 'high' },
+    { id: 'phy-emi-ac', subject: 'Physics', name: 'Electromagnetic Induction and Alternating Currents', weight: 'medium' },
+    { id: 'phy-em-waves', subject: 'Physics', name: 'Electromagnetic Waves', weight: 'low' },
+    { id: 'phy-optics', subject: 'Physics', name: 'Optics', weight: 'high' },
+    { id: 'phy-dual-nature', subject: 'Physics', name: 'Dual Nature of Matter and Radiation', weight: 'medium' },
+    { id: 'phy-atoms-nuclei', subject: 'Physics', name: 'Atoms and Nuclei', weight: 'high' },
+    { id: 'phy-electronic-devices', subject: 'Physics', name: 'Electronic Devices', weight: 'medium' },
+    { id: 'phy-experimental', subject: 'Physics', name: 'Experimental Skills', weight: 'low' },
+
+    // ── Chemistry (20 units) ──
+    { id: 'chem-basic-concepts', subject: 'Chemistry', name: 'Some Basic Concepts in Chemistry', weight: 'medium' },
+    { id: 'chem-atomic-structure', subject: 'Chemistry', name: 'Atomic Structure', weight: 'medium' },
+    { id: 'chem-bonding', subject: 'Chemistry', name: 'Chemical Bonding and Molecular Structure', weight: 'high' },
+    { id: 'chem-thermodynamics', subject: 'Chemistry', name: 'Chemical Thermodynamics', weight: 'medium' },
+    { id: 'chem-solutions', subject: 'Chemistry', name: 'Solutions', weight: 'medium' },
+    { id: 'chem-equilibrium', subject: 'Chemistry', name: 'Equilibrium', weight: 'high' },
+    { id: 'chem-redox-electro', subject: 'Chemistry', name: 'Redox Reactions and Electrochemistry', weight: 'medium' },
+    { id: 'chem-kinetics', subject: 'Chemistry', name: 'Chemical Kinetics', weight: 'medium' },
+    { id: 'chem-periodicity', subject: 'Chemistry', name: 'Classification of Elements and Periodicity in Properties', weight: 'medium' },
+    { id: 'chem-p-block', subject: 'Chemistry', name: 'p-Block Elements', weight: 'high' },
+    { id: 'chem-d-f-block', subject: 'Chemistry', name: 'd- and f-Block Elements', weight: 'medium' },
+    { id: 'chem-coordination', subject: 'Chemistry', name: 'Co-ordination Compounds', weight: 'high' },
+    { id: 'chem-purification', subject: 'Chemistry', name: 'Purification and Characterisation of Organic Compounds', weight: 'low' },
+    { id: 'chem-organic-basics', subject: 'Chemistry', name: 'Some Basic Principles of Organic Chemistry', weight: 'high' },
+    { id: 'chem-hydrocarbons', subject: 'Chemistry', name: 'Hydrocarbons', weight: 'medium' },
+    { id: 'chem-halogens', subject: 'Chemistry', name: 'Organic Compounds Containing Halogens', weight: 'medium' },
+    { id: 'chem-oxygen', subject: 'Chemistry', name: 'Organic Compounds Containing Oxygen', weight: 'high' },
+    { id: 'chem-nitrogen', subject: 'Chemistry', name: 'Organic Compounds Containing Nitrogen', weight: 'medium' },
+    { id: 'chem-biomolecules', subject: 'Chemistry', name: 'Biomolecules', weight: 'medium' },
+    { id: 'chem-practical', subject: 'Chemistry', name: 'Principles Related to Practical Chemistry', weight: 'low' },
+
+    // ── Maths (14 units) ──
+    { id: 'math-sets-functions', subject: 'Maths', name: 'Sets, Relations and Functions', weight: 'medium' },
+    { id: 'math-complex-quadratic', subject: 'Maths', name: 'Complex Numbers and Quadratic Equations', weight: 'medium' },
+    { id: 'math-matrices', subject: 'Maths', name: 'Matrices and Determinants', weight: 'high' },
+    { id: 'math-permutations', subject: 'Maths', name: 'Permutations and Combinations', weight: 'medium' },
+    { id: 'math-binomial', subject: 'Maths', name: 'Binomial Theorem and its Simple Applications', weight: 'medium' },
+    { id: 'math-sequences', subject: 'Maths', name: 'Sequence and Series', weight: 'high' },
+    { id: 'math-limits', subject: 'Maths', name: 'Limit, Continuity and Differentiability', weight: 'high' },
+    { id: 'math-integrals', subject: 'Maths', name: 'Integral Calculus', weight: 'high' },
+    { id: 'math-diff-equations', subject: 'Maths', name: 'Differential Equations', weight: 'medium' },
+    { id: 'math-coordinate', subject: 'Maths', name: 'Co-ordinate Geometry', weight: 'high' },
+    { id: 'math-3d', subject: 'Maths', name: 'Three Dimensional Geometry', weight: 'high' },
+    { id: 'math-vectors', subject: 'Maths', name: 'Vector Algebra', weight: 'high' },
+    { id: 'math-stats-probability', subject: 'Maths', name: 'Statistics and Probability', weight: 'high' },
+    { id: 'math-trigonometry', subject: 'Maths', name: 'Trigonometry', weight: 'medium' },
+  ],
+}
