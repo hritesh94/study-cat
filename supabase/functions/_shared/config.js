@@ -10,6 +10,9 @@ export const AI = {
   // https://ai.google.dev/gemini-api/docs/models (stable) and
   // https://ai.google.dev/gemini-api/docs/pricing ("Free of charge").
   models: { gemini: 'gemini-3.8-flash' },
+  // when that one is too busy for the free tier ("high demand"), try this
+  // one (also stable and free on the free tier, same pages, same date)
+  fallbackModels: { gemini: 'gemini-3.6-flash' },
   // Flash can't switch thinking off; "low" keeps it quick. Thinking tokens
   // count toward maxTokens below, so those leave room for it.
   thinkingLevel: 'low',

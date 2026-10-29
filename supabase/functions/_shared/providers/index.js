@@ -10,7 +10,7 @@ export function getProvider(env) {
   if (name === 'gemini') {
     const apiKey = env('GEMINI_API_KEY')
     if (!apiKey) throw new AiError('ai_down', 'The GEMINI_API_KEY secret is not set')
-    return geminiProvider({ apiKey, model: AI.models.gemini })
+    return geminiProvider({ apiKey, models: [AI.models.gemini, AI.fallbackModels?.gemini].filter(Boolean) })
   }
   throw new AiError('ai_down', `Unknown AI_PROVIDER "${name}"`)
 }

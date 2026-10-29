@@ -83,7 +83,7 @@ console.log('\nProvider: Gemini')
     requests.push({ url, init })
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'thinking…', thought: true }, { text: '{"ok":true}' }] }, finishReason: 'STOP' }] }))
   }
-  const g = geminiProvider({ apiKey: 'test-key', model: AI.models.gemini, fetchImpl, wait: async () => {} })
+  const g = geminiProvider({ apiKey: 'test-key', models: [AI.models.gemini, AI.fallbackModels.gemini], fetchImpl, wait: async () => {} })
   const out = await g.generate({ system: 'sys', messages: [{ role: 'user', text: 'hi', images: [{ mimeType: 'image/png', data: 'AAAA' }] }], schema: { type: 'object' }, maxTokens: 100 })
   const req = requests[0]
   const body = JSON.parse(req.init.body)
@@ -93,21 +93,38 @@ console.log('\nProvider: Gemini')
   check('images are sent as inlineData before the text', body.contents[0].parts[0].inlineData.mimeType === 'image/png' && body.contents[0].parts[1].text === 'hi')
   check("the model's thinking is never returned", out.text === '{"ok":true}', out.text)
 
-  let n = 0
-  const waits = []
-  const flaky = geminiProvider({
-    apiKey: 'k',
-    model: 'm',
-    wait: async (ms) => waits.push(ms),
-    fetchImpl: async () => (++n === 1 ? new Response('busy', { status: 429 }) : new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }))),
-  })
-  const again = await flaky.generate({ system: 's', messages: [{ role: 'user', text: 'x' }], maxTokens: 10 })
-  check('a 429 is retried once after a short wait', again.text === 'ok' && n === 2 && waits[0] === AI.retryAfterMs, `${n} calls, waits ${waits}`)
-  const always429 = geminiProvider({ apiKey: 'k', model: 'm', wait: async () => {}, fetchImpl: async () => new Response('busy', { status: 429 }) })
-  check('a second 429 means "the cat is tired"', (await throwsCode(() => always429.generate({ system: 's', messages: [], maxTokens: 1 }), 'tired')) === true)
-  const offline = geminiProvider({ apiKey: 'k', model: 'm', fetchImpl: async () => { throw new TypeError('fetch failed') } })
+  // a fake Gemini that answers each call from a list of statuses (200 = an answer)
+  const scripted = (...statuses) => {
+    const seen = []
+    const waits = []
+    const provider = geminiProvider({
+      apiKey: 'k',
+      models: ['main-model', 'backup-model'],
+      wait: async (ms) => waits.push(ms),
+      fetchImpl: async (url) => {
+        const status = statuses[seen.length] ?? statuses.at(-1)
+        seen.push(`${url.match(/models\/([^:]+)/)[1]}:${status}`)
+        return status === 200 ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] })) : new Response('busy', { status })
+      },
+    })
+    return { provider, seen, waits, ask: () => provider.generate({ system: 's', messages: [{ role: 'user', text: 'x' }], maxTokens: 10 }) }
+  }
+  let f = scripted(429, 200)
+  let answer = await f.ask()
+  check('a 429 is retried once after a short wait (same model)', answer.text === 'ok' && f.seen.join() === 'main-model:429,main-model:200' && f.waits[0] === AI.retryAfterMs, f.seen.join())
+  f = scripted(503, 503, 200)
+  answer = await f.ask()
+  check('"high demand" (503) twice → the backup model answers', answer.text === 'ok' && answer.model === 'backup-model' && f.seen.join() === 'main-model:503,main-model:503,backup-model:200', f.seen.join())
+  f = scripted(503)
+  check('every model busy → "the cat is tired" (not "napping")', (await throwsCode(f.ask, 'tired')) === true && f.seen.length === 4, f.seen.join())
+  f = scripted(503, 429, 404)
+  check('main busy and the backup unusable → still "tired"', (await throwsCode(f.ask, 'tired')) === true && f.seen.length === 3, f.seen.join())
+  f = scripted(400)
+  check('a real error from the main model → ai_down, no backup tried', (await throwsCode(f.ask, 'ai_down')) === true && f.seen.length === 1, f.seen.join())
+  check('the backup model is in config.js', getProvider((k) => ({ GEMINI_API_KEY: 'k' })[k]).model === AI.models.gemini && AI.fallbackModels.gemini === 'gemini-3.6-flash')
+  const offline = geminiProvider({ apiKey: 'k', models: ['m'], fetchImpl: async () => { throw new TypeError('fetch failed') } })
   check('no connection to Gemini → ai_down', (await throwsCode(() => offline.generate({ system: 's', messages: [], maxTokens: 1 }), 'ai_down')) === true)
-  const blocked = geminiProvider({ apiKey: 'k', model: 'm', fetchImpl: async () => new Response(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } })) })
+  const blocked = geminiProvider({ apiKey: 'k', models: ['m'], fetchImpl: async () => new Response(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } })) })
   check('a blocked or empty answer → bad_output', (await throwsCode(() => blocked.generate({ system: 's', messages: [], maxTokens: 1 }), 'bad_output')) === true)
   check('AI_PROVIDER picks the provider; default gemini', getProvider((k) => ({ GEMINI_API_KEY: 'k' })[k]).name === 'gemini')
   check('no GEMINI_API_KEY secret → ai_down (not a crash)', (await throwsCode(async () => getProvider(() => undefined), 'ai_down')) === true)
