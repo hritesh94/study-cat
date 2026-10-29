@@ -2,11 +2,10 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (the HD cat with the "My Cat" wardrobe, merged into `main` and deployed)
+**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, and accounts with coins and streaks)
 **Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`)
-**Branch `phase-2`:** accounts, coins and streaks with Supabase. Not merged or deployed yet.
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1 complete; Phase 2 (accounts) in progress on `phase-2`
+**Status:** Phase 1 and Phase 2 (accounts, coins, streaks) complete and live
 
 ---
 
@@ -254,7 +253,7 @@ After that:
 
 (Alternative to steps 2–4, from this folder: `npx vercel git connect`. It links the project to the repo in `origin`, but GitHub still asks you to install the Vercel app the first time.)
 
-### Step 17 — Accounts, coins and streaks with Supabase · branch `phase-2`
+### Step 17 — Accounts, coins and streaks with Supabase · built on `phase-2`, merged into `main` and deployed
 Files: `supabase/migrations/*.sql`, `tools/db-test.mjs`, `src/lib/supabase.js`, `src/hooks/useAuth.js`, `useProfile.js`, `useStudySessions.js`, `src/components/AccountPanel.jsx`, `CoinPop.jsx`, `CoinIcon.jsx`, `Sheet.css`, `src/App.jsx`
 - **Supabase** is a hosted Postgres database with logins built in. The browser talks to it directly with `@supabase/supabase-js`.
 - **Keys:** `.env.local` (ignored by Git, never committed) holds `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The same two are set in Vercel for Production, Preview and Development (`npx vercel env add …`, checked with `npx vercel env ls`).
