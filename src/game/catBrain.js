@@ -417,6 +417,17 @@ export class CatBrain {
       await this.hold('sad', Infinity, v)
     },
 
+    // toxic mode, you left: the cat turns its back on you and sulks
+    async sulk(v) {
+      await this.toPosture('stand', v)
+      if (this.stale(v)) return
+      await this.once('turn_around')
+      if (this.stale(v)) return
+      await this.toPosture('sit', v)
+      if (this.stale(v)) return
+      await this.hold('sit_idle', Infinity, v)
+    },
+
     // break: off the stool, onto the rug, look at you, then wait for a button
     async break(v) {
       this.setBusy(true)

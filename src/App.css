@@ -318,3 +318,41 @@ button.icon {
 .app.focus .panel:hover {
   opacity: 1;
 }
+
+/* ── the card after a study session ── */
+.summary {
+  position: absolute;
+  top: 4.2rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-1deg);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.8rem;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 0.35rem 0.5rem 0.35rem 1rem;
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--wobbly);
+  box-shadow: 2px 3px 0 var(--ink-soft);
+  z-index: 3;
+  animation: summary-in 0.3s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.summary-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+.summary-leaves {
+  color: #b4473c;
+  font-weight: 500;
+}
+@keyframes summary-in {
+  from {
+    transform: translateX(-50%) translateY(-10px);
+    opacity: 0;
+  }
+}

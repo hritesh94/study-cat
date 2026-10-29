@@ -6,11 +6,13 @@ import { CoinPop } from './components/CoinPop'
 import { GameCanvas } from './game/GameCanvas'
 import { lineById, pickLine } from './game/catLines'
 import { PrefsPanel } from './components/PrefsPanel'
+import { SessionSummary } from './components/SessionSummary'
 import { Settings } from './components/Settings'
 import { Wardrobe } from './components/Wardrobe'
 import { liveStreak } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useCatVoice } from './hooks/useCatVoice'
+import { useLeaveTracker } from './hooks/useLeaveTracker'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useProfile } from './hooks/useProfile'
 import { useStudySessions } from './hooks/useStudySessions'
@@ -20,6 +22,14 @@ import './App.css'
 
 // What the cat says lives in src/game/catLines.js.
 const BREAK_LINE = lineById('break.idle.01')
+
+// What the cat says when you come back to the tab, by study mode.
+// Medium: the first leaves are free, the last free one gets called out,
+// after that every leave costs coins.
+function leaveLine(mode, count, freeLeaves) {
+  if (mode !== 'medium') return pickLine('leave', mode)
+  return pickLine(count < freeLeaves ? 'leave' : count === freeLeaves ? 'callout' : 'penalty', 'medium')
+}
 
 // Browsers only allow fullscreen right after a click, so we call this from
 // the Start button. If it's refused, the focus view still works in the window.
@@ -38,50 +48,88 @@ export default function App() {
   const { todayMinutes, addStudyMs } = useStudyStats()
   const voice = useCatVoice()
 
+  // ── Account (Supabase): optional; everything works logged out too ──
+  const auth = useAuth()
+  const { profile, settings: gameRules, update: updateProfile, merge: mergeProfile } = useProfile(auth.user)
+  const streak = liveStreak(profile)
+
+  // ── Study mode: easy | medium | toxic (on your profile when logged in) ──
+  const [localMode, setLocalMode] = useLocalStorage('studycat:mode', 'easy')
+  const studyMode = profile ? (profile.study_mode ?? 'easy') : localMode
+  const setStudyMode = (mode) => {
+    setLocalMode(mode)
+    if (profile) updateProfile({ study_mode: mode })
+  }
+
+  const sessionMs = useRef(0) // study time in this session (for the summary card)
+  const skipping = useRef(false)
   const timer = useTimer({
     studyMinutes: settings.studyMinutes,
     breakMinutes: settings.breakMinutes,
-    onStudyTime: addStudyMs,
+    onStudyTime: (ms) => {
+      addStudyMs(ms)
+      sessionMs.current += ms
+    },
     onPhaseChange: (next) => {
       if (next === 'break') {
         exitFullscreen()
-        voice.say(pickLine('finish'))
+        // skipping isn't finishing: no praise (and Toxic mode notices)
+        if (!skipping.current) voice.say(pickLine('finish', studyMode))
+        else if (studyMode === 'toxic') voice.say(pickLine('quit', 'toxic'))
       } else {
         voice.say(pickLine('break.end'))
       }
+      skipping.current = false
     },
   })
 
   const focusing = timer.phase === 'study' && timer.running
 
-  // ── Sad cat: switching tabs during study ──
-  const [sad, setSad] = useState(false)
-  // The event listener below is set up once, so it reads fresh values from this ref.
+  // ── Leaving the tab during study ──
+  // The cat looks sad while you're away (Toxic: turns its back on you), then
+  // says something when you're back. The server turns the count into coins.
+  const [away, setAway] = useState(null) // null | 'sad' | 'sulk'
+  const cheerUp = useRef(null)
+  const leaves = useLeaveTracker({
+    active: focusing,
+    onLeave: () => {
+      clearTimeout(cheerUp.current)
+      setAway(studyMode === 'toxic' ? 'sulk' : 'sad')
+    },
+    onReturn: ({ count }) => {
+      voice.say(leaveLine(studyMode, count, gameRules?.medium_free_leaves ?? 2))
+      cheerUp.current = setTimeout(() => setAway(null), studyMode === 'toxic' ? 6000 : 4000)
+    },
+  })
+  useEffect(() => () => clearTimeout(cheerUp.current), [])
+
+  // ── The card after a study session ──
+  const [summary, setSummary] = useState(null)
+  useEffect(() => {
+    if (!summary) return
+    const hide = setTimeout(() => setSummary(null), 9000)
+    return () => clearTimeout(hide)
+  }, [summary])
+
+  // The listeners below are set up once, so they read fresh values from this ref.
   const latest = useRef({})
   useEffect(() => {
-    latest.current = { focusing, sad, say: voice.say, lineShowing: !!voice.line }
+    latest.current = {
+      say: voice.say,
+      lineShowing: !!voice.line,
+      // logged out there's no server result, so the summary comes from here
+      onFocusEnd: () => {
+        const minutes = Math.floor(sessionMs.current / 60000)
+        const count = leaves.current()
+        if (minutes > 0 || count > 0) setSummary({ id: Date.now(), minutes, leaves: count, penalty: 0 })
+      },
+    }
   })
+  const wasFocusing = useRef(false)
   useEffect(() => {
-    let cheerUp
-    const onVisibilityChange = () => {
-      const { focusing, sad, say } = latest.current
-      if (document.hidden) {
-        if (focusing) {
-          clearTimeout(cheerUp)
-          setSad(true)
-        }
-      } else if (sad) {
-        // You're back: the cat complains, stays sad a moment, then forgives you.
-        say(pickLine('leave'))
-        cheerUp = setTimeout(() => setSad(false), 4000)
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      clearTimeout(cheerUp)
-    }
-  }, [])
+    if (wasFocusing.current && !focusing && !profile) latest.current.onFocusEnd()
+    wasFocusing.current = focusing
+  }, [focusing, profile])
 
   // ── The cat (a Phaser game) ──
   // React decides WHAT the cat should be doing; the cat's brain decides HOW
@@ -89,11 +137,6 @@ export default function App() {
   const game = useRef(null)
   const panelRef = useRef(null)
   const [catBusy, setCatBusy] = useState(true)
-
-  // ── Account (Supabase): optional; everything works logged out too ──
-  const auth = useAuth()
-  const { profile, settings: gameRules, update: updateProfile, merge: mergeProfile } = useProfile(auth.user)
-  const streak = liveStreak(profile)
 
   // Which cat you have: from your profile when logged in, else this browser.
   const [localLook, setLocalLook] = useLocalStorage('studycat:cat', { breed: 'orange', outfit: null })
@@ -139,8 +182,12 @@ export default function App() {
     enabled: !!profile,
     focusing,
     plannedMinutes: () => Math.ceil(timer.remainingMs / 60000),
+    leaveCount: leaves.current,
     onResult: (r) => {
       mergeProfile({ coins: r.coins, current_streak: r.current_streak, best_streak: r.best_streak, last_study_day: r.last_study_day })
+      if (r.counted_minutes > 0 || r.leave_count > 0) {
+        setSummary({ id: Date.now(), minutes: r.counted_minutes, coins: r.coins_awarded, penalty: r.penalty_coins ?? 0, leaves: r.leave_count ?? 0 })
+      }
       if (r.coins_awarded <= 0 && !r.capped) return
       setCoinPop({ id: Date.now(), coins: r.coins_awarded })
       setCoinBump(true)
@@ -158,7 +205,7 @@ export default function App() {
       clearTimeout(unbump)
     }
   }, [coinPop])
-  const timerGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (sad ? 'sad' : 'study') : 'break'
+  const timerGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (away ?? 'study') : 'break'
   const catGoal = wardrobeOpen ? 'showOff' : timerGoal
   const mood = focusing ? 'focus' : timer.phase === 'break' ? 'break' : 'idle'
 
@@ -185,13 +232,30 @@ export default function App() {
   const start = () => {
     if (timer.phase === 'study') {
       enterFullscreen()
-      voice.say(pickLine('start'))
+      // a new study session: nothing counted yet
+      leaves.reset()
+      sessionMs.current = 0
+      clearTimeout(cheerUp.current)
+      setAway(null)
+      setSummary(null)
+      voice.say(pickLine('start', studyMode))
     }
     timer.start()
   }
+  // Toxic mode has opinions about stopping early
+  const quitLine = () => focusing && studyMode === 'toxic' && voice.say(pickLine('quit', 'toxic'))
   const pause = () => {
     exitFullscreen()
+    quitLine()
     timer.pause()
+  }
+  const reset = () => {
+    quitLine()
+    timer.reset()
+  }
+  const skip = () => {
+    skipping.current = timer.phase === 'study'
+    timer.skip()
   }
 
   return (
@@ -289,8 +353,17 @@ export default function App() {
       )}
 
       <CoinPop pop={coinPop} />
+      <SessionSummary summary={summary} onClose={() => setSummary(null)} />
 
-      <PrefsPanel ref={prefsRef} open={sheet === 'prefs'} onClose={closeSheet} voice={voice} />
+      <PrefsPanel
+        ref={prefsRef}
+        open={sheet === 'prefs'}
+        onClose={closeSheet}
+        voice={voice}
+        mode={studyMode}
+        onModeChange={setStudyMode}
+        modeLocked={focusing}
+      />
       <Wardrobe ref={wardrobeRef} open={wardrobeOpen} onClose={closeSheet} look={catLook} onChange={setCatLook} />
       {auth.enabled && (
         <AccountPanel
@@ -316,8 +389,8 @@ export default function App() {
           ) : (
             <button className="primary" onClick={start}>Start</button>
           )}
-          <button onClick={timer.reset}>Reset</button>
-          <button onClick={timer.skip}>{timer.phase === 'study' ? 'Skip to break' : 'End break'}</button>
+          <button onClick={reset}>Reset</button>
+          <button onClick={skip}>{timer.phase === 'study' ? 'Skip to break' : 'End break'}</button>
         </div>
         <Settings {...settings} onChange={setSettings} disabled={timer.running} />
         {auth.enabled && auth.ready && !auth.user && (

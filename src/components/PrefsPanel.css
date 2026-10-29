@@ -58,3 +58,80 @@ input.volume:focus-visible {
   outline: 3px solid var(--purple);
   outline-offset: 3px;
 }
+
+/* ── study modes ── */
+.modes {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.modes legend {
+  padding: 0;
+  margin-bottom: 0.35rem;
+}
+.mode-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+button.mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.45rem 0.6rem 0.55rem;
+  text-align: left;
+  background: var(--paper);
+  border-radius: 14px 18px 12px 16px / 16px 12px 18px 14px;
+}
+button.mode.picked {
+  background: #fde3c4;
+  box-shadow: inset 0 0 0 2px var(--orange-dark);
+}
+.mode-name {
+  font-weight: 600;
+}
+.mode-about {
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--muted);
+}
+.modes:disabled button.mode {
+  opacity: 0.6;
+  cursor: default;
+}
+.prefs-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.toxic-confirm {
+  padding: 0.6rem 0.8rem;
+  background: #fbe0dc;
+  border: 2.5px solid var(--ink);
+  border-radius: 16px 20px 14px 18px / 18px 14px 20px 16px;
+  animation: sheet-up 0.2s ease-out;
+}
+.toxic-confirm p {
+  margin: 0 0 0.5rem;
+}
+.toxic-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .mode-list {
+    grid-template-columns: 1fr;
+  }
+  button.mode {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .mode-name {
+    min-width: 5.2rem;
+  }
+}

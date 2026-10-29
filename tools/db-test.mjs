@@ -59,12 +59,15 @@ async function as(uid, sql, params) {
 const backdate = (id, minutes) =>
   admin(`update public.study_sessions set started_at = now() - make_interval(secs => $2) where id = $1`, [id, minutes * 60])
 const utcDay = async (offset = 0) => (await admin(`select ((now() at time zone 'utc')::date + $1::int)::text as d`, [offset]))[0].d
-async function session(uid, planned, minutesAgo, day) {
+async function session(uid, planned, minutesAgo, day, leaves) {
   const start = await as(uid, `select public.start_session($1) as id`, [planned])
   if (start.error) throw new Error(start.error)
   const id = start.rows[0].id
   await backdate(id, minutesAgo)
-  const end = await as(uid, `select public.end_session($1, $2) as r`, [id, day])
+  const end =
+    leaves === undefined
+      ? await as(uid, `select public.end_session($1, $2) as r`, [id, day]) // the old 2-argument call still works
+      : await as(uid, `select public.end_session($1, $2, $3) as r`, [id, day, leaves])
   if (end.error) throw new Error(end.error)
   return end.rows[0].r
 }
@@ -163,6 +166,50 @@ check('missing a day resets the streak (5 min on day 5 → 0)', res.current_stre
 res = await session(B, 25, 25, day(5))
 check('…and reaching 25 min on day 5 starts again at 1, best stays 3', res.current_streak === 1 && res.best_streak === 3)
 await admin(`update public.game_settings set local_day_tolerance_days = 1`)
+
+console.log('\nStudy modes (a fresh user, Cat, so the daily cap starts at 0)')
+const C = '33333333-3333-3333-3333-333333333333'
+await admin(`insert into auth.users (id, email) values ($1, 'cat@example.com')`, [C])
+const mode = async (uid) => (await admin(`select study_mode from public.profiles where id = $1`, [uid]))[0].study_mode
+check('new profiles start in easy mode', (await mode(C)) === 'easy')
+r = await as(C, `update public.profiles set study_mode = 'chaos' where id = $1`, [C])
+check('only easy / medium / toxic are allowed', r.error?.includes('check'), r.error ?? 'no error')
+r = await as(C, `update public.profiles set study_mode = 'toxic' where id = $1 returning id`, [B])
+check("Cat can't change Ben's mode", r.rows.length === 0 && (await mode(B)) === 'easy')
+res = await session(C, 50, 50, today, 5)
+check('easy: leaving 5 times costs nothing (50 + 10 bonus)', res.coins_awarded === 60 && res.penalty_coins === 0 && res.leave_count === 5, JSON.stringify(res))
+r = await as(C, `update public.profiles set study_mode = 'medium' where id = $1 returning study_mode`, [C])
+check('Cat can switch herself to medium', r.rows[0]?.study_mode === 'medium', r.error ?? '')
+res = await session(C, 50, 50, today, 2)
+check('medium: the first 2 leaves are free', res.coins_awarded === 60 && res.penalty_coins === 0 && res.study_mode === 'medium', JSON.stringify(res))
+res = await session(C, 50, 50, today, 3)
+check('medium: the 3rd leave removes 10% (60 → 54)', res.coins_awarded === 54 && res.penalty_coins === 6 && res.session_coins === 60, JSON.stringify(res))
+const row = (await admin(`select study_mode, leave_count, penalty_coins, coins_awarded from public.study_sessions where id = $1`, [res.session_id]))[0]
+check('the session row keeps its mode, leaves and penalty', row.study_mode === 'medium' && row.leave_count === 3 && row.penalty_coins === 6 && row.coins_awarded === 54, JSON.stringify(row))
+res = await session(C, 50, 50, today, 5)
+check('medium: 5 leaves → 3 × 10% off (60 → 42)', res.coins_awarded === 42 && res.penalty_coins === 18, JSON.stringify(res))
+res = await session(C, 50, 50, today, 15)
+check('medium: 15 leaves → never below 0 coins', res.coins_awarded === 0 && res.penalty_coins === 60, JSON.stringify(res))
+await as(C, `update public.profiles set study_mode = 'toxic' where id = $1`, [C])
+res = await session(C, 50, 50, today, 4)
+check('toxic: each leave costs 5 coins (60 − 20 = 40)', res.coins_awarded === 40 && res.penalty_coins === 20 && res.study_mode === 'toxic', JSON.stringify(res))
+res = await session(C, 1, 1, today, 50)
+check('toxic: a penalty bigger than the session gives 0, not minus', res.coins_awarded === 0 && res.penalty_coins === 1, JSON.stringify(res))
+// day total so far: 60 + 60 + 54 + 42 + 0 + 40 + 0 = 256, so 44 are left under the cap
+res = await session(C, 50, 50, today, 4)
+check('the penalty comes off BEFORE the cap (60 − 20 = 40 fits in the 44 left)', res.coins_awarded === 40 && !res.capped, JSON.stringify(res))
+res = await session(C, 50, 50, today, -10)
+check('a negative leave count is treated as 0 (no extra coins)', res.leave_count === 0 && res.penalty_coins === 0 && res.coins_awarded === 4 && res.capped, JSON.stringify(res))
+res = await session(C, 20, 20, today)
+check('old call without leave_count counts as 0 leaves', res.leave_count === 0 && res.penalty_coins === 0, JSON.stringify(res))
+res = await session(C, 50, 50, today, 2)
+check('toxic at the cap: penalty still recorded, 0 coins', res.coins_awarded === 0 && res.penalty_coins === 10 && res.capped, JSON.stringify(res))
+const dayC = (await admin(`select sum(coins_awarded)::int as n from public.study_sessions where user_id = $1 and study_day = $2`, [C, today]))[0].n
+check('with penalties the daily cap still holds', dayC === 300, `day total ${dayC}`)
+const coinsC = (await admin(`select coins from public.profiles where id = $1`, [C]))[0].coins
+check("Cat's coins equal the sum of her sessions", coinsC === dayC, `${coinsC} vs ${dayC}`)
+r = await as(C, `update public.profiles set study_mode = 'easy', coins = 5000 where id = $1`, [C])
+check("changing the mode doesn't open the coins column", r.error?.includes('permission denied'), r.error ?? 'no error')
 
 console.log('\nEach user sees only their own sessions')
 const mine = await as(A, `select distinct user_id from public.study_sessions`)

@@ -8,15 +8,18 @@ import { localDay, supabase } from '../lib/supabase'
 //   focusing turns off (study ends, Skip, Pause,
 //                       Reset)                    → end_session → onResult
 //
+// leaveCount() = how often you left the tab; the server turns that into a
+// coin penalty for your study mode (the browser never sends coins).
+//
 // Calls are queued one after another, so a quick Start-Pause can't mix up
 // their order. If the tab is closed mid-session, the server closes that
 // session (with nothing counted) the next time one starts.
-export function useStudySessions({ enabled, focusing, plannedMinutes, onResult, onError }) {
+export function useStudySessions({ enabled, focusing, plannedMinutes, leaveCount, onResult, onError }) {
   const queue = useRef(Promise.resolve())
   const openId = useRef(null)
   const latest = useRef({})
   useEffect(() => {
-    latest.current = { plannedMinutes, onResult, onError }
+    latest.current = { plannedMinutes, leaveCount, onResult, onError }
   })
 
   useEffect(() => {
@@ -32,11 +35,16 @@ export function useStudySessions({ enabled, focusing, plannedMinutes, onResult, 
         openId.current = data
       })
     } else {
+      const leaves = latest.current.leaveCount?.() ?? 0 // counted now, not when the queue gets to it
       run(async () => {
         const id = openId.current
         if (!id) return
         openId.current = null
-        const { data, error } = await supabase.rpc('end_session', { p_session_id: id, p_local_day: localDay() })
+        const { data, error } = await supabase.rpc('end_session', {
+          p_session_id: id,
+          p_local_day: localDay(),
+          p_leave_count: leaves,
+        })
         if (error) throw error
         latest.current.onResult?.(data)
       })

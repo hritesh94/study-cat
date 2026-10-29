@@ -1,10 +1,23 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './Sheet.css'
 import './PrefsPanel.css'
 
-// The ⚙️ settings sheet: sound now; study mode and book mode join later.
-export function PrefsPanel({ ref, open, onClose, voice, children }) {
+const STUDY_MODES = [
+  { id: 'easy', emoji: '😺', name: 'Easy', about: 'Leaving the tab makes the cat a little sad. No coins lost.' },
+  { id: 'medium', emoji: '😼', name: 'Medium', about: '2 free trips away per session. Each one after that costs 10% of its coins.' },
+  { id: 'toxic', emoji: '😾', name: 'Toxic', about: 'The cat roasts you every time you leave, and each leave costs 5 coins.' },
+]
+
+// The ⚙️ settings sheet: sound and study mode (book mode joins on phones).
+export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, children }) {
   const closeButton = useRef(null)
+  const [confirmToxic, setConfirmToxic] = useState(false)
+  const pickMode = (id) => {
+    if (id === mode) return
+    if (id === 'toxic') return setConfirmToxic(true)
+    setConfirmToxic(false)
+    onModeChange(id)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -51,6 +64,47 @@ export function PrefsPanel({ ref, open, onClose, voice, children }) {
         />
         <span className="prefs-value">{voice.muted ? 'off' : `${percent}%`}</span>
       </div>
+
+      <fieldset className="modes" disabled={modeLocked}>
+        <legend className="prefs-label">Study mode</legend>
+        <div className="mode-list">
+          {STUDY_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`mode${mode === m.id ? ' picked' : ''}`}
+              aria-pressed={mode === m.id}
+              onClick={() => pickMode(m.id)}
+            >
+              <span className="mode-name">
+                <span aria-hidden="true">{m.emoji}</span> {m.name}
+              </span>
+              <span className="mode-about">{m.about}</span>
+            </button>
+          ))}
+        </div>
+        {modeLocked && <p className="prefs-note">You can change the mode after this study session.</p>}
+      </fieldset>
+
+      {confirmToxic && (
+        <div className="toxic-confirm" role="alertdialog" aria-label="Turn on Toxic mode?">
+          <p>
+            <strong>Are you sure?</strong> The cat will roast you.
+          </p>
+          <div className="toxic-buttons">
+            <button
+              className="primary"
+              onClick={() => {
+                setConfirmToxic(false)
+                onModeChange('toxic')
+              }}
+            >
+              Roast me 😾
+            </button>
+            <button onClick={() => setConfirmToxic(false)}>Never mind</button>
+          </div>
+        </div>
+      )}
 
       {children}
     </section>
