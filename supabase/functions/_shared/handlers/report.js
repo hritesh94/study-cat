@@ -12,6 +12,7 @@ import { systemPrompt } from '../prompts.js'
 import { generateJson } from '../providers/index.js'
 import { WEEKDAYS, addDays, liveStreak, localDayIn, roadmapProgress, weekday } from '../stats.js'
 import { clip, isDay, timeZone as validTimeZone } from '../validate.js'
+import { voiceProfile } from '../voiceProfile.js'
 
 export const REPORT_SCHEMA = {
   type: 'object',
@@ -51,7 +52,7 @@ export async function report(body, { store, ai, now }) {
   const existing = await store.weeklyReport(weekStart)
   if (existing) return { report: existing, cached: true }
 
-  const [stats, profile, goal] = await Promise.all([store.weekStats(weekStart), store.profile(), store.activeGoal()])
+  const [stats, profile, goal] = await Promise.all([store.weekStats(weekStart), voiceProfile(store), store.activeGoal()])
   const roadmap = goal ? await store.latestRoadmap(goal.id).catch(() => null) : null
   const extra = {
     streak: liveStreak(profile, today),

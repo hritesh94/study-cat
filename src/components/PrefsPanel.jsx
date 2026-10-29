@@ -1,15 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
+import { sampleLine } from '../game/catLines'
 import './Sheet.css'
 import './PrefsPanel.css'
 
-const STUDY_MODES = [
-  { id: 'easy', emoji: '😺', name: 'Easy', about: 'Leaving the tab makes the cat a little sad. No coins lost.' },
-  { id: 'medium', emoji: '😼', name: 'Medium', about: '2 free trips away per session. Each one after that costs 10% of its coins.' },
-  { id: 'toxic', emoji: '😾', name: 'Toxic', about: 'The cat roasts you every time you leave, and each leave costs 5 coins.' },
+// Strictness: what leaving the tab costs. The ids are the database's
+// study_mode values (easy / medium / toxic); the server's penalty rules for
+// them are unchanged. HOW the cat talks is the personality, set separately.
+const STRICTNESS = [
+  { id: 'easy', emoji: '😺', name: 'Chill', about: 'Leaving the tab makes the cat a little sad. No coins lost.' },
+  { id: 'medium', emoji: '😼', name: 'Normal', about: '2 free trips away per session. Each one after that costs 10% of its coins.' },
+  { id: 'toxic', emoji: '😾', name: 'Strict', about: 'Every trip away costs 5 coins, and the cat turns its back on you.' },
 ]
 
-// The ⚙️ settings sheet: sound and study mode (book mode joins on phones).
-export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, children }) {
+// How the cat talks (only its words: what leaving costs is the strictness).
+const PERSONALITIES = [
+  { id: 'sweet', emoji: '😺', name: 'Sweet', about: 'Cozy and gentle.' },
+  { id: 'diva', emoji: '💅', name: 'Diva', about: 'Hypes you like a queen, drags your excuses.' },
+  { id: 'gang', emoji: '🤙', name: 'Gang', about: 'Your Gen Z study buddy. No cap.' },
+  { id: 'savage', emoji: '🔥', name: 'Savage', about: 'Roasts your habits, never you.' },
+]
+const LANGUAGES = [
+  { id: 'en', name: 'English' },
+  { id: 'hinglish', name: 'Hinglish' },
+]
+
+// The ⚙️ settings sheet: the cat's voice (personality, language, spicy),
+// sound, and strictness (book mode joins on phones).
+//   catStyle = { personality, language, spicy }; onStyleChange(fields)
+//   onSay(line): the cat says a sample line
+//   onMemory: opens "What the cat knows about me" (logged in only)
+export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, modeLocked, catStyle, onStyleChange, onSay, onMemory, children }) {
   const closeButton = useRef(null)
   const [confirmToxic, setConfirmToxic] = useState(false)
   const pickMode = (id) => {
@@ -37,6 +57,64 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
           ×
         </button>
       </header>
+
+      <fieldset className="modes">
+        <legend className="prefs-label">Personality</legend>
+        <div className="mode-list personalities">
+          {PERSONALITIES.map((p) => {
+            const sample = sampleLine(p.id, catStyle.language)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`mode${catStyle.personality === p.id ? ' picked' : ''}`}
+                aria-pressed={catStyle.personality === p.id}
+                onClick={() => {
+                  if (p.id !== catStyle.personality) onStyleChange({ personality: p.id })
+                  onSay(sample) // hear it
+                }}
+              >
+                <span className="mode-name">
+                  <span aria-hidden="true">{p.emoji}</span> {p.name}
+                </span>
+                <span className="mode-about">{p.about}</span>
+                <span className="mode-sample">“{sample.text}”</span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      <div className="prefs-row">
+        <span className="prefs-label">Language</span>
+        <div className="prefs-choices" role="radiogroup" aria-label="Language">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="radio"
+              aria-checked={catStyle.language === l.id}
+              className={catStyle.language === l.id ? 'picked' : ''}
+              onClick={() => onStyleChange({ language: l.id })}
+            >
+              {l.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="prefs-row prefs-spicy">
+        <input type="checkbox" checked={catStyle.spicy} onChange={(e) => onStyleChange({ spicy: e.target.checked })} />
+        <span>
+          <span className="prefs-label">Spicy lines</span> <span className="prefs-note-inline">(contains swearing)</span>
+        </span>
+      </label>
+
+      {onMemory && (
+        <button className="prefs-memory" onClick={onMemory}>
+          🧠 What the cat knows about me
+        </button>
+      )}
 
       <div className="prefs-row">
         <span className="prefs-label" id="volume-label">
@@ -66,9 +144,9 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
       </div>
 
       <fieldset className="modes" disabled={modeLocked}>
-        <legend className="prefs-label">Study mode</legend>
+        <legend className="prefs-label">Strictness</legend>
         <div className="mode-list">
-          {STUDY_MODES.map((m) => (
+          {STRICTNESS.map((m) => (
             <button
               key={m.id}
               type="button"
@@ -83,13 +161,13 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
             </button>
           ))}
         </div>
-        {modeLocked && <p className="prefs-note">You can change the mode after this study session.</p>}
+        {modeLocked && <p className="prefs-note">You can change strictness after this study session.</p>}
       </fieldset>
 
       {confirmToxic && (
-        <div className="toxic-confirm" role="alertdialog" aria-label="Turn on Toxic mode?">
+        <div className="toxic-confirm" role="alertdialog" aria-label="Turn on Strict?">
           <p>
-            <strong>Are you sure?</strong> The cat will roast you.
+            <strong>Are you sure?</strong> Every trip away from the tab costs 5 coins.
           </p>
           <div className="toxic-buttons">
             <button
@@ -99,7 +177,7 @@ export function PrefsPanel({ ref, open, onClose, voice, mode, onModeChange, mode
                 onModeChange('toxic')
               }}
             >
-              Roast me 😾
+              Yes, strict 😾
             </button>
             <button onClick={() => setConfirmToxic(false)}>Never mind</button>
           </div>

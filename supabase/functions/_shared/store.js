@@ -15,7 +15,7 @@ export function makeStore({ db, admin, userId }) {
     release: async (kind) => must(await admin.rpc('ai_release', { p_user: userId, p_kind: kind })),
 
     settings: async () => must(await db.from('game_settings').select('*').single()),
-    profile: async () => must(await db.from('profiles').select('display_name, current_streak, best_streak, last_study_day, study_mode').eq('id', userId).single()),
+    profile: async () => must(await db.from('profiles').select('display_name, current_streak, best_streak, last_study_day, study_mode, personality, language, spicy, learning').eq('id', userId).single()),
     activeGoal: async () => must(await db.from('goals').select('*').eq('active', true).maybeSingle()),
     goal: async (id) => must(await db.from('goals').select('*').eq('id', id).maybeSingle()),
     latestRoadmap: async (goalId) =>
@@ -48,6 +48,33 @@ export function makeStore({ db, admin, userId }) {
       const other = await admin.from('weekly_reports').select('week_start, stats, summary, tip, created_at').eq('user_id', userId).eq('week_start', weekStart).maybeSingle()
       return must(other)
     },
+    // ── what the cat learned (cat_memory) and today's lines (line_packs) ──
+    memory: async () =>
+      must(await db.from('cat_memory').select('goals, motivates, demotivates, talk_style, habits, processed_until, updated_at').maybeSingle()),
+    // the chat messages after `since` (all of the last 60 if null), oldest first
+    chatSince: async (since) => {
+      let query = db.from('chat_messages').select('role, text, meta, created_at').order('created_at', { ascending: false }).limit(60)
+      if (since) query = query.gt('created_at', since)
+      return must(await query).reverse()
+    },
+    // with the server key; the database refuses it when learning is off
+    saveMemory: async (fields) =>
+      must(
+        await admin
+          .from('cat_memory')
+          .upsert({ user_id: userId, ...fields, updated_at: new Date().toISOString() })
+          .select('goals, motivates, demotivates, talk_style, habits, processed_until, updated_at')
+          .single(),
+      ),
+    pack: async (day) => must(await db.from('line_packs').select('day, personality, language, spicy, lines').eq('day', day).maybeSingle()),
+    savePack: async (row) =>
+      must(
+        await admin
+          .from('line_packs')
+          .upsert({ user_id: userId, ...row }, { onConflict: 'user_id,day' })
+          .select('day, personality, language, spicy, lines')
+          .single(),
+      ),
     saveQuiz: async (topic, questions) => must(await admin.from('quizzes').insert({ user_id: userId, topic, questions }).select('id').single()),
     saveRoadmap: async (goalId, plan) =>
       must(await admin.from('roadmaps').insert({ user_id: userId, goal_id: goalId, plan }).select('id, goal_id, plan, created_at').single()),

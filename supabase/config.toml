@@ -416,7 +416,7 @@ enabled = true
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
 # ── Study Cat's AI functions ──────────────────────────────────────────
-# All four only answer logged-in users: Supabase checks the login token
+# All of them only answer logged-in users: Supabase checks the login token
 # before the function runs (verify_jwt), and the function checks it again
 # with Supabase Auth (supabase/functions/_shared/deno.js).
 [functions.chat]
@@ -429,4 +429,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.report]
+verify_jwt = true
+
+[functions.memory]
+verify_jwt = true
+
+[functions.pack]
 verify_jwt = true

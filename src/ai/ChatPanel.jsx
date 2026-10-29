@@ -4,6 +4,7 @@ import { CrisisCard } from './CrisisCard'
 import { GOAL_KINDS } from './useGoal'
 import '../components/Sheet.css'
 import './ChatPanel.css'
+import './MemoryPanel.css'
 
 // The first thing the cat says (the chat function uses the same line).
 const HELLO_NEW = "Mrrp, hi! I'm your study cat. What are you studying for?"
@@ -67,7 +68,8 @@ function GoalConfirm({ goal, onConfirm, onEdit, saved }) {
 //   chat     from useChat()
 //   goal     your active goal (null = none yet: the cat asks about it)
 //   onAction(name, payload)  'roadmap' | 'quiz' | 'goal' | 'login' | 'confirm-goal' | 'edit-goal'
-export function ChatPanel({ ref, open, onClose, loggedIn, chat, goal, situation, onAction }) {
+//   learning from useLearning(): asks "Can I learn about you?" once
+export function ChatPanel({ ref, open, onClose, loggedIn, chat, goal, situation, onAction, learning }) {
   const [draft, setDraft] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const [savedGoals, setSavedGoals] = useState(() => new Set()) // message ids whose goal was saved
@@ -151,6 +153,17 @@ export function ChatPanel({ ref, open, onClose, loggedIn, chat, goal, situation,
                 Delete
               </button>
               <button onClick={() => setConfirmClear(false)}>Keep</button>
+            </div>
+          )}
+          {learning && learning.learning === null && (
+            <div className="learn-ask" role="group" aria-label="Can the cat learn about you?">
+              <p>Can I learn how you like to study, so I talk more like you? I only remember study things, and you can see or delete them anytime in Settings.</p>
+              <div className="chat-actions">
+                <button className="primary" onClick={() => learning.setLearning(true)}>
+                  Yes, learn about me
+                </button>
+                <button onClick={() => learning.setLearning(false)}>No thanks</button>
+              </div>
             </div>
           )}
           <ol className="chat-list" ref={list} aria-live="polite">

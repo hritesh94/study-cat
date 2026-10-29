@@ -12,6 +12,7 @@ import { AiError } from '../errors.js'
 import { systemPrompt } from '../prompts.js'
 import { generateJson } from '../providers/index.js'
 import { CRISIS_REPLY, detectDistress } from '../safety.js'
+import { voiceProfile } from '../voiceProfile.js'
 import { WEEKDAYS, addDays, describeGoal, describeStats, localDayIn, studyStats, weekday } from '../stats.js'
 import { clip, isDay, num, oneOf, text, timeZone as validTimeZone } from '../validate.js'
 
@@ -130,7 +131,7 @@ export async function chat(body, { store, ai, now }) {
   let result
   try {
     const [profile, goal, history, sessions] = await Promise.all([
-      store.profile(),
+      voiceProfile(store),
       store.activeGoal(),
       store.chatHistory(CHAT.historyMessages),
       store.sessionsSince(addDays(today, -CHAT.statsDays)),
@@ -139,11 +140,9 @@ export async function chat(body, { store, ai, now }) {
     const onboarding = !goal
     const alreadySuggested = currentConversation(history, nowDate).some((m) => m.meta?.suggest && m.meta.suggest !== 'none')
 
-    const context = [
-      `Today is ${WEEKDAYS[weekday(today)]}, ${today}. ${situation}`,
-      describeStats(studyStats(sessions ?? [], { profile, timeZone: tz, today, days: CHAT.statsDays })),
-      describeGoal(goal, roadmap, today),
-    ].join('\n')
+    const context = [`Today is ${WEEKDAYS[weekday(today)]}, ${today}. ${situation}`, describeGoal(goal, roadmap, today)].join('\n')
+    // the study numbers (calculated by code) go into the cat's voice
+    profile.stats = describeStats(studyStats(sessions ?? [], { profile, timeZone: tz, today, days: CHAT.statsDays }))
 
     const messages = history.map((m) => ({ role: m.role === 'cat' ? 'model' : 'user', text: m.text }))
     if (onboarding && !messages.length) messages.push({ role: 'model', text: ONBOARDING_HELLO })
