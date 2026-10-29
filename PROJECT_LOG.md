@@ -2,8 +2,7 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (still the SVG puppet version from `main`)
-**Branch `game-cat`:** the cat and room now run in **Phaser** (a 2D game engine) as pixel art, not deployed yet
+**Live app:** https://study-cat-pink.vercel.app (the Phaser pixel cat, merged into `main` and deployed)
 **Stack:** React 19 + Vite 8 + Phaser 3.90
 **Status:** Phase 1 complete, cozy redesign, and now the game-engine cat (no login, no backend)
 
@@ -132,13 +131,13 @@ The one-shape cat couldn't *do* things, so it was rebuilt like a paper puppet.
 - **Try it yourself:** while `npm run dev` is running, open the browser console and type `studyCat.play('pageTurn')`, or any action or pose name from `poses.js`.
 - `App.jsx`, `hooks/` and `components/` are unchanged. The old name `eating` still works: it now plays `sipping`.
 
-### Step 13 — Pixel cat in Phaser + a cat brain · branch `game-cat`
+### Step 13 — Pixel cat in Phaser + a cat brain · built on branch `game-cat`, merged in `b02da02`
 Files: `src/game/*`, `public/game/cat/*`, `tools/cat-generator/*`, `src/App.jsx`, `src/App.css`
 ```bash
 git switch -c game-cat          # a new branch, so main stays safe
 npm install phaser@3.90.0
 ```
-- **Branch:** all of this lives on `game-cat`. `main` still has the SVG puppet, which is the deployed version. `git switch main` and `git switch game-cat` jump between them.
+- **Branch:** it was built on `game-cat` so `main` stayed safe. After you checked it locally, it was merged into `main` and deployed (`git merge --no-ff game-cat`).
 - **The sprite pack:** it came already unzipped as `study-cat-3d/` (there was no `.zip` file to delete).
   - `study-cat.png` (a sprite sheet: 22 animations, each frame 64 × 64 px) and `study-cat.json` (where each animation starts, how many frames, fps, loop) → `public/game/cat/`, so the game can load them.
   - The Python generator, previews and README → `tools/cat-generator/`. Nothing in `tools/` is deployed. Its `out/` folder is git-ignored.
@@ -250,7 +249,8 @@ To reset everything, open the browser console on the site and run `localStorage.
 - ✅ **Debug panel:** raw animations pause the brain, "follow the timer" resumes it, and slow motion slows animations, tweens and timers together. Without `?debug` the panel isn't there.
 - ✅ **Phone:** 3× zoom, the camera follows the cat, and its feet stay above the panel.
 - ✅ Lint and build clean. Phaser is in its own lazy-loaded file, and `tools/` isn't in the build.
-- ⚠️ Not deployed yet (on purpose). The voice still wasn't listened to (muted during tests).
+- ✅ After merging into `main`: deployed, and the live site loads the game with no console errors; `tools/` isn't served.
+- ⚠️ The voice still wasn't listened to (muted during tests).
 
 **Earlier SVG puppet (on `main`)** was checked at 1280×800, 800×600 and 375×812: every pose, the hops, sad, the bubble, and the phone layout.
 
@@ -296,5 +296,4 @@ If a new sprite animation is added to the pack, add one line to `ANIMS` in `catA
 - Sounds (purring, meows, rain on the window) and a "session complete" notification
 - Day/night room that follows your real clock
 - More behaviours for the Phaser cat (chasing a falling leaf, napping in a sunbeam)
-- Deploy the `game-cat` branch once it's been checked locally
 - Unlockable room decorations as study rewards
