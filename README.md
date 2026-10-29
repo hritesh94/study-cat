@@ -1,51 +1,57 @@
 # Study Cat 🐱
 
-A cozy 2D storybook Pomodoro timer: a cat keeps you company in a warm little room while you study.
-Built with React + Vite + Phaser, with an HD sprite cat in 5 breeds and 5 outfits.
+A cozy Pomodoro study timer with a cat who keeps you company. While you study, the cat sits at its desk and reads, turning a page now and then. On your break it hops down to the rug and wants to play, eat or have a bath. Switch tabs during study and it gets sad.
 
-**Live:** https://study-cat-pink.vercel.app · **Full build history and explanations:** [PROJECT_LOG.md](PROJECT_LOG.md)
+**Live:** https://study-cat-pink.vercel.app
 
-## Run it
+<p align="center">
+  <img src="tools/cat-generator-hd/previews/page_turn_tuxedo_scarf.gif" width="200" alt="A tuxedo cat in a scarf, reading and turning a page">
+  <img src="tools/cat-generator-hd/previews/walk_orange_beanie.gif" width="200" alt="An orange tabby in a beanie, walking">
+  <img src="tools/cat-generator-hd/previews/sleep_siamese_flowers.gif" width="200" alt="A siamese cat in a flower crown, asleep">
+</p>
+
+<p align="center">
+  <img src="tools/cat-generator-hd/previews/outfits.png" width="720" alt="The five breeds, each wearing an outfit">
+</p>
+
+## Features
+
+- Study / break timer (50 / 10 minutes by default, adjustable), with today's study minutes saved in the browser
+- An animated cat that walks to the desk, reads, takes breaks, naps when you're idle, and meows when you click it
+- **My Cat** wardrobe: 5 breeds and 5 outfits
+- The cat speaks short lines with the browser's built-in speech (you can mute it)
+- A cozy room with lighting that changes between study and break
+
+## Tech stack
+
+- [React 19](https://react.dev) + [Vite](https://vite.dev): the app, timer and panels
+- [Phaser 3](https://phaser.io): the room and the cat (sprite animations, camera)
+- A small state machine (`src/game/catBrain.js`) that only moves the cat through its animation chains, so it never snaps between poses
+- Web Speech API for the cat's voice, `localStorage` for saved settings
+- Hosted on [Vercel](https://vercel.com)
+
+## Run it locally
+
+You need [Node.js](https://nodejs.org) 20.19+ or 22.12+ (what Vite 8 requires).
 
 ```bash
+git clone https://github.com/hritesh94/study-cat.git
+cd study-cat
 npm install
 npm run dev
 ```
 
-Then open http://localhost:5173.
+Then open http://localhost:5173. Add `?debug` to the address for the cat debug panel (every animation, breed and outfit, plus slow motion).
 
-## How the code is organized
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Build the site into `dist/` |
+| `npm run lint` | Check the code |
+| `npm run thumbs` | Re-cut the wardrobe pictures after changing the sprite sheets |
 
-```
-src/
-  App.jsx                 the screen: decides what the cat does and when
-  hooks/
-    useTimer.js           study/break countdown (accurate in background tabs)
-    useStudyStats.js      today's study minutes, saved in localStorage
-    useCatVoice.js        speech bubble + browser speech (Web Speech API)
-    useLocalStorage.js    useState that survives page reloads
-  components/
-    Settings.jsx          study/break length inputs
-    BreakPanel.jsx        Play / Feed / Bathe buttons
-    Wardrobe.jsx          the "My Cat" panel: breeds and outfits
-  game/
-    GameCanvas.jsx        React <-> Phaser bridge
-    RoomScene.js          the Phaser scene: pixel room, cat, camera, lighting
-    catBrain.js           the cat's state machine (goals, tasks, scripts)
-    catItems.js           every breed and outfit, with (future) locks
-    catAnims.js           each animation's start/end posture + chain route-finder
-    layout.js             spots and prop positions (game pixels)
-    roomArt.js            the room and props (drawn at 3× resolution)
-    DebugPanel.jsx        the ?debug panel
-public/game/cat/          study-cat.json, breeds/, outfits/ (HD sprite sheets)
-tools/cat-generator-hd/   the HD pack's generator, previews, README (not deployed)
-```
+## How it was built
 
-## The cat
+[PROJECT_LOG.md](PROJECT_LOG.md) walks through every step, from the first timer to the HD cat, with plain-language explanations.
 
-The cat is an HD sprite pack (see `tools/cat-generator-hd/README.md`) driven by a state machine in
-`src/game/catBrain.js`. It only moves through the pack's transition chains, so it never snaps.
-Pick a breed and outfit with the **🐱 My Cat** button; the choice is saved in localStorage (`studycat:cat`).
-After changing the sprite sheets, run `npm run thumbs` to refresh the wardrobe pictures.
-Open `http://localhost:5173/?debug` for breed/outfit pickers, buttons for every animation and state, plus slow motion.
-More in [PROJECT_LOG.md](PROJECT_LOG.md) (steps 13–15).
+The cat sprites were made for this project by the generator in `tools/cat-generator-hd/` (Python; see its README).

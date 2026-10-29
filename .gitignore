@@ -25,5 +25,10 @@ dist-ssr
 
 .vercel
 
-# HD cat generator output (python make.py)
-tools/cat-generator-hd/generator/out/
+# generator output anywhere under tools/ (e.g. python make.py)
+tools/**/out/
+
+# secrets: never commit these (.env.local is also covered by *.local)
+.env
+.env.*
+!.env.example
