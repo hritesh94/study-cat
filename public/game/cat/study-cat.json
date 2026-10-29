@@ -1,0 +1,169 @@
+{
+  "image": "study-cat.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "framesPerRow": 10,
+  "origin": {
+    "x": 0.5,
+    "y": 0.8125,
+    "note": "feet touch this point; use sprite.setOrigin(x, y)"
+  },
+  "deskTopY": 42,
+  "facing": "three-quarter right; flipX for left",
+  "animations": {
+    "idle": {
+      "start": 0,
+      "frames": 8,
+      "fps": 6,
+      "loop": true,
+      "note": "standing, breathing, small head turns, blink"
+    },
+    "walk": {
+      "start": 10,
+      "frames": 8,
+      "fps": 10,
+      "loop": true,
+      "note": "walk cycle, three-quarter view facing right (flip for left)"
+    },
+    "turn_around": {
+      "start": 20,
+      "frames": 7,
+      "fps": 12,
+      "loop": false,
+      "note": "turns from facing right to facing left, through facing you; then flip the sprite and keep walking"
+    },
+    "sit_down": {
+      "start": 30,
+      "frames": 6,
+      "fps": 12,
+      "loop": false,
+      "note": "stand -> sit"
+    },
+    "sit_idle": {
+      "start": 40,
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "note": "sitting loop"
+    },
+    "stand_up": {
+      "start": 50,
+      "frames": 6,
+      "fps": 12,
+      "loop": false,
+      "note": "sit -> stand"
+    },
+    "look_at_you": {
+      "start": 60,
+      "frames": 10,
+      "fps": 8,
+      "loop": false,
+      "note": "sitting, turns its head to look at you, blinks, smiles, looks back"
+    },
+    "turn_front": {
+      "start": 70,
+      "frames": 5,
+      "fps": 12,
+      "loop": false,
+      "note": "sitting, turns its whole body to face you"
+    },
+    "sit_front": {
+      "start": 80,
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "note": "sitting facing you"
+    },
+    "meow": {
+      "start": 90,
+      "frames": 6,
+      "fps": 9,
+      "loop": false,
+      "note": "facing you, meows (on click)"
+    },
+    "turn_back": {
+      "start": 100,
+      "frames": 5,
+      "fps": 12,
+      "loop": false,
+      "note": "facing you -> back to three-quarter sit"
+    },
+    "read_start": {
+      "start": 110,
+      "frames": 5,
+      "fps": 10,
+      "loop": false,
+      "note": "sit -> paws on the book (book and glasses included)"
+    },
+    "read": {
+      "start": 120,
+      "frames": 8,
+      "fps": 4,
+      "loop": true,
+      "note": "reading loop"
+    },
+    "page_turn": {
+      "start": 130,
+      "frames": 8,
+      "fps": 12,
+      "loop": false,
+      "note": "paw flips a page"
+    },
+    "read_end": {
+      "start": 140,
+      "frames": 5,
+      "fps": 10,
+      "loop": false,
+      "note": "paws off book -> sit"
+    },
+    "sleep_down": {
+      "start": 150,
+      "frames": 7,
+      "fps": 10,
+      "loop": false,
+      "note": "sit -> curl up"
+    },
+    "sleep": {
+      "start": 160,
+      "frames": 6,
+      "fps": 3,
+      "loop": true,
+      "note": "curled up, breathing, zzz"
+    },
+    "wake_up": {
+      "start": 170,
+      "frames": 7,
+      "fps": 10,
+      "loop": false,
+      "note": "curled -> sit"
+    },
+    "eat": {
+      "start": 180,
+      "frames": 8,
+      "fps": 8,
+      "loop": true,
+      "note": "eating from a bowl"
+    },
+    "sad": {
+      "start": 190,
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "note": "ears down, a tear rolls"
+    },
+    "play": {
+      "start": 200,
+      "frames": 8,
+      "fps": 12,
+      "loop": true,
+      "note": "bats a yarn ball"
+    },
+    "jump": {
+      "start": 210,
+      "frames": 6,
+      "fps": 12,
+      "loop": false,
+      "note": "crouch, leap, tuck, land (move the sprite in the engine)"
+    }
+  }
+}
