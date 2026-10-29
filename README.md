@@ -27,10 +27,12 @@ src/
   components/
     Settings.jsx          study/break length inputs
     BreakPanel.jsx        Play / Feed / Bathe buttons
+    Wardrobe.jsx          the "My Cat" panel: breeds and outfits
   game/
     GameCanvas.jsx        React <-> Phaser bridge
     RoomScene.js          the Phaser scene: pixel room, cat, camera, lighting
     catBrain.js           the cat's state machine (goals, tasks, scripts)
+    catItems.js           every breed and outfit, with (future) locks
     catAnims.js           each animation's start/end posture + chain route-finder
     layout.js             spots and prop positions (game pixels)
     roomArt.js            the room and props (drawn at 3× resolution)
@@ -43,6 +45,7 @@ tools/cat-generator-hd/   the HD pack's generator, previews, README (not deploye
 
 The cat is an HD sprite pack (see `tools/cat-generator-hd/README.md`) driven by a state machine in
 `src/game/catBrain.js`. It only moves through the pack's transition chains, so it never snaps.
-Breed and outfit are saved in localStorage (`studycat:cat`).
+Pick a breed and outfit with the **🐱 My Cat** button; the choice is saved in localStorage (`studycat:cat`).
+After changing the sprite sheets, run `npm run thumbs` to refresh the wardrobe pictures.
 Open `http://localhost:5173/?debug` for breed/outfit pickers, buttons for every animation and state, plus slow motion.
-More in [PROJECT_LOG.md](PROJECT_LOG.md) (steps 13 and 14).
+More in [PROJECT_LOG.md](PROJECT_LOG.md) (steps 13–15).
