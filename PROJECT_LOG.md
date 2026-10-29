@@ -386,7 +386,12 @@ To reset everything, open the browser console on the site and run `localStorage.
 - ✅ Phone: the logged-in top bar (coins, streak, 👤) fits on one line (checked with sample values).
 - ✅ The "+N coins" pop shows over the cat's head, and the cat faces you (checked with sample markup).
 - ✅ Vercel has both variables for Production, Preview and Development, matching `.env.local` exactly.
-- ⏳ **Not tested by Claude:** logging in with real accounts. A magic link arrives by email, so that needs your inboxes. See "Testing with two accounts" below.
+- ✅ **Live, with two real accounts** (done by you, since magic links need your inboxes), on the real Supabase project:
+  - Magic-link login works once emails go through Brevo.
+  - With the daily cap lowered to 5, coins stopped at the cap and the app said "Today's coins are all collected".
+  - From the browser console, `update({ coins: 9999 })` on your own profile was refused: **403 Forbidden**.
+  - A second account saw **exactly one profile row, its own** (0 coins, 0 streak), and none of the first account's data.
+- ⚠️ During the test, supabase-js warned the computer's clock was about 1 hour off. Coins are safe (the server keeps time), but keep the device clock on "Set time automatically", since the app uses the device's date for "today".
 
 #### Testing with two accounts (do this after pasting the 3 SQL files)
 Use two browsers (or a normal and a private window), one account each, with 1-minute study sessions. While testing, in the SQL Editor, `update public.game_settings set daily_coin_cap = 5;` makes the cap easy to hit. Afterwards set it back with `update public.game_settings set daily_coin_cap = 300;`.
