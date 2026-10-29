@@ -2,10 +2,10 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, and the real room art)
+**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, Phase 2b, the real room art, and the cat's AI)
 **Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`, `room-art`, `ai-core`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is on branch `ai-core`, not merged yet
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live. Real room art and 10 new cat animations (step 20) are merged and live too. The cat's AI (step 21: chat, goals and roadmap, quiz, weekly report) is merged and live too
 
 ---
 
@@ -422,7 +422,7 @@ Files: `public/game/cat/*`, `public/game/room/*`, `tools/cat-generator-hd/*`, `s
   - study → sad → study → break: **0 chain breaks**.
   - 9 room states: empty, half, full shelf, every droopy stage, and the sparkling jar.
 
-### Step 21 — The cat's AI: chat, goals and roadmap, break quiz, weekly report · built on branch `ai-core` (not merged or deployed yet)
+### Step 21 — The cat's AI: chat, goals and roadmap, break quiz, weekly report · built on branch `ai-core`, merged into `main` and deployed
 Commits: `d22bbe7` AI core, `479c7ca` part 1 (chat), `0a02724` part 2 (goals and roadmap), `a17a097` part 3 (quiz), `c1d0e72` part 4 (weekly report), `7002121` fixes from testing.
 
 #### Set it up, step by step (in your own terminal: PowerShell, in the study-cat folder)
@@ -449,7 +449,7 @@ Commits: `d22bbe7` AI core, `479c7ca` part 1 (chat), `0a02724` part 2 (goals and
    ```
    `HTTP/2 401` means it's deployed and locked. Then try it for real: `npm run dev` on this branch, log in, tap 💬 and say hi. If something's wrong, the details are in Supabase → Edge Functions → (the function) → Logs.
 
-The live app (on `main`) doesn't have the AI yet: it comes with the merge, after you've checked it.
+Tried for real on localhost (chat, a NEET PG goal and its roadmap), then merged into `main` and deployed. The Edge Functions and the 12 SQL files were already on Supabase, so the live site uses them straight away.
 
 #### How it's built (security first)
 - **The key never leaves Supabase.** Only the Edge Functions (`supabase/functions/`) talk to the AI. They read `GEMINI_API_KEY` from the secret on the server. The browser sends your login token, never a key.
