@@ -10,12 +10,22 @@
   background: radial-gradient(circle at 50% 40%, #2f5249, #18282a 70%);
 }
 
+.app {
+  /* shared layout: the room, cat and speech bubble all line up from these */
+  --floor: 40vh;
+  --cat-size: min(42vh, 380px);
+  --cat-bottom: calc(var(--floor) - 7vh);
+  --desk-w: clamp(240px, 28vw, 440px);
+  --desk-right: 4vw;
+  --desk-bottom: calc(var(--floor) - 4vh);
+}
+
 .cat-stage {
   position: absolute;
   left: 50%;
-  bottom: 33vh;
-  width: min(42vh, 380px);
-  height: min(42vh, 380px);
+  bottom: var(--cat-bottom);
+  width: var(--cat-size);
+  height: var(--cat-size);
   transform: translateX(-50%);
   z-index: 1;
 }
