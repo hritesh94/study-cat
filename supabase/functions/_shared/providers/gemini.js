@@ -58,7 +58,10 @@ export function geminiProvider({ apiKey, models, fetchImpl = fetch, wait = sleep
             continue
           }
           if (BUSY.has(res.status) || res.status === TIMED_OUT) {
-            console.warn(`[ai] ${model} is busy (${res.status}), ${m + 1 < models.length ? 'trying the backup model' : 'giving up'}`)
+            // Google's own words (e.g. "high demand", or a quota with "limit: 0",
+            // which means this key gets no free use of that model at all)
+            const why = res.status === TIMED_OUT ? `no answer within ${timeoutMs / 1000} s` : (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 400)
+            console.warn(`[ai] ${model} is busy (${res.status}): ${why} → ${m + 1 < models.length ? 'trying the backup model' : 'giving up'}`)
             break
           }
           // the fallback model can't be used (e.g. renamed): that's not "busy"
