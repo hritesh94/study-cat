@@ -34,6 +34,20 @@ export function makeStore({ db, admin, userId }) {
     chatHistory: async (n) =>
       must(await db.from('chat_messages').select('role, text, meta, created_at').order('created_at', { ascending: false }).limit(n)).reverse(),
     saveChat: async (rows) => must(await admin.from('chat_messages').insert(rows.map((r) => ({ ...r, user_id: userId })))),
+    weekStats: async (weekStart) => must(await db.rpc('week_stats', { p_week_start: weekStart })),
+    weeklyReport: async (weekStart) =>
+      must(await db.from('weekly_reports').select('week_start, stats, summary, tip, created_at').eq('week_start', weekStart).maybeSingle()),
+    saveWeeklyReport: async (weekStart, stats, { summary, tip }) => {
+      const { data, error } = await admin
+        .from('weekly_reports')
+        .insert({ user_id: userId, week_start: weekStart, stats, summary, tip })
+        .select('week_start, stats, summary, tip, created_at')
+        .single()
+      if (!error) return data
+      // made at the same moment by another request: keep that one
+      const other = await admin.from('weekly_reports').select('week_start, stats, summary, tip, created_at').eq('user_id', userId).eq('week_start', weekStart).maybeSingle()
+      return must(other)
+    },
     saveQuiz: async (topic, questions) => must(await admin.from('quizzes').insert({ user_id: userId, topic, questions }).select('id').single()),
     saveRoadmap: async (goalId, plan) =>
       must(await admin.from('roadmaps').insert({ user_id: userId, goal_id: goalId, plan }).select('id, goal_id, plan, created_at').single()),

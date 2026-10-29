@@ -6,6 +6,8 @@ import { GoalRing } from './ai/GoalRing'
 import { QuizBubble } from './ai/QuizBubble'
 import { RoadmapPanel } from './ai/RoadmapPanel'
 import { useQuiz } from './ai/useQuiz'
+import { WeeklyReport } from './ai/WeeklyReport'
+import { lastWeekStart, useWeeklyReport } from './ai/useWeeklyReport'
 import { buildSchedule, dayTarget } from './ai/schedule'
 import { useChat } from './ai/useChat'
 import { useGoal } from './ai/useGoal'
@@ -243,7 +245,7 @@ export default function App() {
 
   // One bottom sheet at a time: the "My Cat" wardrobe or the account panel.
   // While the wardrobe is open the cat shows off its look.
-  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar' | 'chat' | 'goal' | 'roadmap'
+  const [sheet, setSheet] = useState(null) // null | 'wardrobe' | 'account' | 'prefs' | 'subject' | 'calendar' | 'chat' | 'goal' | 'roadmap' | 'report'
   const wardrobeRef = useRef(null)
   const accountRef = useRef(null)
   const prefsRef = useRef(null)
@@ -254,6 +256,7 @@ export default function App() {
   const goalRef = useRef(null)
   const roadmapRef = useRef(null)
   const ringButton = useRef(null)
+  const reportRef = useRef(null)
   const calendarOpener = useRef(null) // the 🔥 or the Today pill, whichever opened it
   const myCatButton = useRef(null)
   const accountButton = useRef(null)
@@ -265,7 +268,7 @@ export default function App() {
   const closeSheet = useCallback(() => {
     // keyboard users land back on the button they came from
     const from =
-      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener, chat: chatButton, roadmap: ringButton, goal: ringButton }[openSheet.current] ?? myCatButton
+      { account: accountButton, prefs: prefsButton, subject: startButton, calendar: calendarOpener, chat: chatButton, roadmap: ringButton, goal: ringButton, report: calendarOpener }[openSheet.current] ?? myCatButton
     setSheet(null)
     from.current?.focus()
   }, [setSheet])
@@ -276,7 +279,7 @@ export default function App() {
   }
   const wardrobeOpen = sheet === 'wardrobe'
   // what the game must keep the cat above
-  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef, chatRef, goalRef, roadmapRef], [])
+  const coverRefs = useMemo(() => [panelRef, wardrobeRef, accountRef, prefsRef, subjectRef, calendarRef, chatRef, goalRef, roadmapRef, reportRef], [])
 
   // ── Chat with the cat (the AI, logged in only) ──
   const chat = useChat({ userId: profile?.id ?? null, open: sheet === 'chat' })
@@ -413,6 +416,32 @@ export default function App() {
     setSummary(null)
     quizApi.offer(chapter?.name ?? subject?.name ?? '', chapter?.subject ?? subject?.name ?? null)
   }
+
+  // ── Weekly report: on Mondays it opens by itself (once per week) ──
+  const reportApi = useWeeklyReport()
+  const loadReport = reportApi.load
+  const reportTried = useRef(false)
+  useEffect(() => {
+    if (!profile || reportTried.current || new Date().getDay() !== 1) return
+    reportTried.current = true
+    const week = lastWeekStart()
+    let seen = null
+    try {
+      seen = localStorage.getItem('studycat:reportSeen')
+    } catch {
+      // no storage: it may show again next time, that's fine
+    }
+    if (seen === week) return
+    loadReport().then((report) => {
+      if (!report) return
+      try {
+        localStorage.setItem('studycat:reportSeen', week)
+      } catch {
+        // see above
+      }
+      if (report.stats.minutes > 0 && !openSheet.current) setSheet('report')
+    })
+  }, [profile, loadReport])
 
   const timerGoal = !timer.running ? 'wander' : timer.phase === 'study' ? (away ?? 'study') : 'break'
   const catGoal = wardrobeOpen ? 'showOff' : timerGoal
@@ -626,7 +655,9 @@ export default function App() {
         bestStreak={shownBest}
         streakMinutes={streakMinutes}
         version={statsVersion}
+        onReport={profile ? () => setSheet('report') : undefined}
       />
+      <WeeklyReport ref={reportRef} open={sheet === 'report'} onClose={closeSheet} api={reportApi} />
       <SubjectPicker
         ref={subjectRef}
         open={sheet === 'subject'}

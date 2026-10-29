@@ -520,6 +520,29 @@ check('a quiz older than 6 hours expires', r.error?.includes('expired'), r.error
 r = await as(null, `select public.answer_quiz($1, 0, $2)`, [quizD, today])
 check("logged-out visitors can't answer", r.error?.includes('permission denied'), r.error ?? 'no error')
 
+console.log('\nWeekly report (migration 11)')
+const monday = (await admin(`select date_trunc('week', $1::date)::date::text as d`, [today]))[0].d
+const week = async (uid, start = monday) => as(uid, `select public.week_stats($1) as w`, [start])
+r = await week(D)
+const w = r.rows[0]?.w
+const realD = (await admin(`select coalesce(sum(counted_minutes), 0)::int as m, count(*)::int as n from public.study_sessions where user_id = $1 and ended_at is not null and counted_minutes > 0 and study_day between $2::date and $2::date + 6`, [D, monday]))[0]
+check("week_stats: the week's minutes and sessions", w?.minutes === realD.m && w.sessions === realD.n && w.minutes > 0, JSON.stringify({ w, realD }))
+check('week_stats: days, best day, subjects, coins incl. bonuses, goal days', w?.days_studied === 1 && w.best_day?.minutes === realD.m && Array.isArray(w.subjects) && w.goal_days === 1 && w.coins >= 15, JSON.stringify(w))
+r = await week(B)
+const realB = (await admin(`select count(*)::int as n from public.study_sessions where user_id = $1 and ended_at is not null and counted_minutes > 0 and study_day between $2::date and $2::date + 6`, [B, monday]))[0].n
+check('week_stats only counts your own sessions', r.rows[0]?.w.sessions === realB, JSON.stringify(r.rows[0]?.w))
+r = await week(D, (await admin(`select ($1::date + 1)::text as d`, [monday]))[0].d) // a Tuesday
+check('a week must start on a Monday', r.error?.includes('Monday'), r.error ?? 'no error')
+r = await as(null, `select public.week_stats($1)`, [monday])
+check("logged-out visitors can't call week_stats", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await as(D, `insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, '{}', 'x', 'y')`, [D, monday])
+check("users can't write their own report (only the report function)", r.error?.includes('permission denied'), r.error ?? 'no error')
+r = await asService(`insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, $3, 'A good week!', 'Keep going.') returning id`, [D, monday, JSON.stringify(w)])
+check('the report function saves a report', r.rows.length === 1, r.error ?? '')
+r = await asService(`insert into public.weekly_reports (user_id, week_start, stats, summary, tip) values ($1, $2, '{}', 'again', 'again')`, [D, monday])
+check('one report per week', r.error?.includes('duplicate') || r.error?.includes('unique'), r.error ?? 'no error')
+check('Dee reads her report, Ana does not', (await as(D, `select summary from public.weekly_reports`)).rows.length === 1 && (await as(A, `select summary from public.weekly_reports`)).rows.length === 0)
+
 console.log(`\n${passed} passed, ${failures.length} failed`)
 if (failures.length) {
   console.log('Failed:\n - ' + failures.join('\n - '))

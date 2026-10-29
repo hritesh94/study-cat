@@ -10,7 +10,8 @@ const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
 // Tap the 🔥 (or "Today") → a month of study: each day coloured by
 // minutes, streak days joined by a little flame trail, tap a day for more.
-export function StreakCalendar({ ref, open, onClose, userId, local, streak, bestStreak, streakMinutes, version }) {
+// onReport: opens last week's report (logged in only)
+export function StreakCalendar({ ref, open, onClose, userId, local, streak, bestStreak, streakMinutes, version, onReport }) {
   const today = localDay()
   const [month, setMonth] = useState(monthOf(today))
   const [picked, setPicked] = useState(today)
@@ -59,9 +60,16 @@ export function StreakCalendar({ ref, open, onClose, userId, local, streak, best
     <section ref={ref} className="sheet calendar" role="dialog" aria-label="Study calendar" hidden={!open}>
       <header className="sheet-head">
         <h2>Study calendar</h2>
-        <button className="icon" onClick={onClose} aria-label="Close" ref={closeButton}>
-          ×
-        </button>
+        <div className="calendar-head-buttons">
+          {onReport && (
+            <button className="calendar-report" onClick={onReport}>
+              📝 Weekly report
+            </button>
+          )}
+          <button className="icon" onClick={onClose} aria-label="Close" ref={closeButton}>
+            ×
+          </button>
+        </div>
       </header>
 
       <dl className="calendar-stats">

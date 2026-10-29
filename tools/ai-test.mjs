@@ -17,6 +17,7 @@ import { image, text } from '../supabase/functions/_shared/validate.js'
 import { chat, ONBOARDING_HELLO, validGoal } from '../supabase/functions/_shared/handlers/chat.js'
 import { availableHours, roadmap } from '../supabase/functions/_shared/handlers/roadmap.js'
 import { quiz, validQuestions } from '../supabase/functions/_shared/handlers/quiz.js'
+import { describeWeek, mondayOf, report } from '../supabase/functions/_shared/handlers/report.js'
 import { buildSchedule, dayTarget } from '../src/ai/schedule.js'
 
 let passed = 0
@@ -356,6 +357,54 @@ console.log('\nBreak quiz')
   check('a topic over 200 characters is refused', (await throwsCode(() => quiz({ topic: 'x'.repeat(201) }, deps(fakeStore(), fakeAi('x'))), 'too_big')) === true)
   const sad = await quiz({ topic: 'I want to die' }, deps(fakeStore(), fakeAi('x')))
   check('a topic that suggests distress gets the crisis answer, not a quiz', sad.crisis === true && !sad.questions)
+}
+
+console.log('\nWeekly report (numbers from the database, words from the AI)')
+{
+  // NOW is Friday 2026-10-30, so last week is Monday 2026-10-19 to Sunday 10-25
+  const stats = {
+    week_start: '2026-10-19',
+    week_end: '2026-10-25',
+    minutes: 615,
+    sessions: 9,
+    days_studied: 5,
+    best_day: { day: '2026-10-22', minutes: 190 },
+    subjects: [{ name: 'Physics', minutes: 400 }, { name: 'Chemistry', minutes: 215 }],
+    coins: 421,
+    goal_days: 2,
+  }
+  const reportStore = (over = {}) => {
+    const s = fakeStore({ limit: 1, ...over })
+    s.savedReport = null
+    s.weeklyReport = async () => over.existing ?? null
+    s.weekStats = async (week) => ({ ...stats, week_start: week, ...(over.stats ?? {}) })
+    s.saveWeeklyReport = async (week, numbers, words) => (s.savedReport = { week_start: week, stats: numbers, ...words, created_at: 'now' })
+    return s
+  }
+  check('mondayOf', mondayOf('2026-10-30') === '2026-10-26' && mondayOf('2026-10-26') === '2026-10-26' && mondayOf('2026-11-01') === '2026-10-26')
+  let store = reportStore()
+  let ai = fakeAi({ summary: 'You studied 10 h 15 min over 5 days. Thursday was your best!', tip: 'Give Chemistry a little more time.' })
+  let out = await report({ timeZone: 'Asia/Kolkata' }, deps(store, ai))
+  const prompt = ai.calls[0].system
+  check('last week by default (Monday to Sunday)', out.report.week_start === '2026-10-19')
+  check('the numbers in the prompt come from the database', prompt.includes('Studied 10 h 15 min in 9 sessions, on 5 of 7 days') && prompt.includes('Best day: Thursday (3 h 10 min)') && prompt.includes('Physics 6 h 40 min'))
+  check('streak and roadmap progress are in it too', prompt.includes('Current streak: 3 days') && prompt.includes('No roadmap yet'))
+  check('the AI is told never to invent numbers', prompt.includes('never invent or change a number'))
+  check("the saved report keeps the database's numbers (not the AI's)", store.savedReport.stats.minutes === 615 && store.savedReport.stats.streak === 3 && out.report.summary.startsWith('You studied'))
+  store = reportStore({ existing: { week_start: '2026-10-19', stats, summary: 'old', tip: 'old tip' } })
+  ai = fakeAi('x')
+  out = await report({}, deps(store, ai))
+  check('a report is written once per week: asking again is free', out.cached === true && ai.calls.length === 0 && store.used === 0)
+  store = reportStore({ stats: { minutes: 0, sessions: 0, days_studied: 0, best_day: null, subjects: [], coins: 0 } })
+  ai = fakeAi('x')
+  out = await report({}, deps(store, ai))
+  check('a week with no study: a kind note, without the AI', ai.calls.length === 0 && out.report.summary.includes('quiet') && store.used === 0)
+  check('1 report a day: the 2nd new one is refused', (await throwsCode(() => report({ weekStart: '2026-10-12' }, deps(reportStore({ used: 1 }), fakeAi('x'))), 'limit')) === true)
+  check('a week must start on a Monday', (await throwsCode(() => report({ weekStart: '2026-10-20' }, deps(reportStore(), fakeAi('x'))), 'bad_input')) === true)
+  check("this week isn't over yet", (await throwsCode(() => report({ weekStart: '2026-10-26' }, deps(reportStore(), fakeAi('x'))), 'bad_input')) === true)
+  store = reportStore()
+  check('an empty AI answer is refused (and the call given back)', (await throwsCode(() => report({}, deps(store, fakeAi({ summary: '', tip: '' }))), 'bad_output')) === true && store.used === 0)
+  check('describeWeek handles a week without subjects', describeWeek({ ...stats, subjects: [], best_day: null }, { streak: 0, bestStreak: 0, roadmap: null }).includes('No best day'))
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`)
