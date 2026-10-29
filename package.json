@@ -8,16 +8,19 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "thumbs": "node tools/make-thumbs.mjs"
+    "thumbs": "node tools/make-thumbs.mjs",
+    "test:db": "node tools/db-test.mjs"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",
     "@fontsource/patrick-hand": "^5.3.0",
+    "@supabase/supabase-js": "^2.118.0",
     "phaser": "^3.90.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
