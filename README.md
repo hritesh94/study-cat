@@ -1,7 +1,7 @@
 # Study Cat 🐱
 
-A Pomodoro study timer with a 3D cat companion.
-Built with React + Vite + React Three Fiber.
+A cozy 2D storybook Pomodoro timer: a cat keeps you company in a warm little room while you study.
+Built with React + Vite + SVG.
 
 **Live:** https://study-cat-pink.vercel.app · **Full build history and explanations:** [PROJECT_LOG.md](PROJECT_LOG.md)
 
@@ -28,19 +28,17 @@ src/
     Settings.jsx          study/break length inputs
     BreakPanel.jsx        Play / Feed / Bathe buttons
   cat/
-    catConfig.js          animation names + settings for a real model
-    Cat.jsx               picks the placeholder or the .glb model
-    PlaceholderCat.jsx    cat made of spheres/cones, posed every frame
-    GlbCat.jsx            loads a real .glb and plays its clips
-    CatScene.jsx          3D canvas, camera and lights
+    catConfig.js          the animation names (the cat's "contract")
+    Cat.jsx               the SVG cat + mouse tracking
+    cat.css               every pose and loop, per animation
+    CatScene.jsx          room + cat together
     useStudyCycle.js      rotates reading → eating → watching while you study
+  scene/
+    Room.jsx              window, plant, desk, lamp, mug, floor, rug
+    room.css              room layout, falling leaves, study/break lighting
 ```
 
-## Swapping in a real cat model
+## Changing the cat
 
-1. Put your model at `public/models/cat.glb`.
-2. In `src/cat/catConfig.js`, set `modelUrl: '/models/cat.glb'`.
-3. Map each app animation (`reading`, `sad`, `play`, ...) to a clip name in your file
-   under `clipNames`. Adjust `scale` / `position` until it sits right.
-
-Nothing else needs to change — the app only ever asks the cat to "play animation X".
+The app only ever asks the cat to "play animation X" (names in `src/cat/catConfig.js`).
+Redraw the cat in `Cat.jsx` / `cat.css` and keep those names, and nothing else needs to change.
