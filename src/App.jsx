@@ -1,8 +1,19 @@
+import { CatScene } from './cat/CatScene'
+import { useStudyCycle } from './cat/useStudyCycle'
 import { Settings } from './components/Settings'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useStudyStats } from './hooks/useStudyStats'
 import { formatTime, useTimer } from './hooks/useTimer'
 import './App.css'
+
+// Browsers only allow fullscreen right after a click, so we call this from
+// the Start button. If it's refused, the focus view still works in the window.
+function enterFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {})
+}
+function exitFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+}
 
 export default function App() {
   const [settings, setSettings] = useLocalStorage('studycat:settings', {
@@ -15,10 +26,28 @@ export default function App() {
     studyMinutes: settings.studyMinutes,
     breakMinutes: settings.breakMinutes,
     onStudyTime: addStudyMs,
+    onPhaseChange: (next) => {
+      if (next === 'break') exitFullscreen()
+    },
   })
 
+  const focusing = timer.phase === 'study' && timer.running
+  const studyAnimation = useStudyCycle(focusing)
+  const catAnimation = focusing ? studyAnimation : 'idle'
+
+  const start = () => {
+    if (timer.phase === 'study') enterFullscreen()
+    timer.start()
+  }
+  const pause = () => {
+    exitFullscreen()
+    timer.pause()
+  }
+
   return (
-    <div className="app">
+    <div className={`app ${focusing ? 'focus' : ''} ${timer.phase}`}>
+      <CatScene animation={catAnimation} />
+
       <header className="topbar">
         <h1>Study Cat</h1>
         <span className="today">Today: {todayMinutes} min</span>
@@ -29,9 +58,9 @@ export default function App() {
         <div className="time">{formatTime(timer.remainingMs)}</div>
         <div className="controls">
           {timer.running ? (
-            <button onClick={timer.pause}>Pause</button>
+            <button onClick={pause}>Pause</button>
           ) : (
-            <button className="primary" onClick={timer.start}>Start</button>
+            <button className="primary" onClick={start}>Start</button>
           )}
           <button onClick={timer.reset}>Reset</button>
           <button onClick={timer.skip}>Skip</button>

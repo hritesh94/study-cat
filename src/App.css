@@ -2,6 +2,40 @@
   position: relative;
   height: 100%;
   overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #35304f, var(--bg) 70%);
+  transition: background 0.8s;
+}
+
+.app.break {
+  background: radial-gradient(circle at 50% 40%, #2f5249, #18282a 70%);
+}
+
+/* The 3D canvas fills the whole screen, behind everything else. */
+.scene {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* ── Focus view: while studying, hide everything except the cat and the time ── */
+.app.focus {
+  background: radial-gradient(circle at 50% 40%, #241f36, var(--bg-focus) 70%);
+}
+
+.app.focus .topbar,
+.app.focus .settings,
+.app.focus .controls button:not(:first-child) {
+  display: none;
+}
+
+.app.focus .panel {
+  background: transparent;
+  backdrop-filter: none;
+  opacity: 0.55;
+  transition: opacity 0.3s;
+}
+
+.app.focus .panel:hover {
+  opacity: 1;
 }
 
 .topbar {
