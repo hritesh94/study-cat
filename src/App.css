@@ -10,10 +10,14 @@
   background: radial-gradient(circle at 50% 40%, #2f5249, #18282a 70%);
 }
 
-/* The 3D canvas fills the whole screen, behind everything else. */
-.scene {
-  position: absolute !important;
-  inset: 0;
+.cat-stage {
+  position: absolute;
+  left: 50%;
+  bottom: 33vh;
+  width: min(42vh, 380px);
+  height: min(42vh, 380px);
+  transform: translateX(-50%);
+  z-index: 1;
 }
 
 /* ── Focus view: while studying, hide everything except the cat and the time ── */
