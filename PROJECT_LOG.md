@@ -2,10 +2,10 @@
 
 Everything built so far, in order, with simple explanations of what each piece does and why.
 
-**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, and accounts with coins and streaks)
+**Live app:** https://study-cat-pink.vercel.app (HD cat, My Cat wardrobe, accounts with coins and streaks, and Phase 2b)
 **Code:** https://github.com/hritesh94/study-cat (public; branches `main`, `game-cat`, `phase-2`, `phase-2b`)
 **Stack:** React 19 + Vite 8 + Phaser 3.90 + Supabase (Auth + Postgres)
-**Status:** Phase 1 and Phase 2 (accounts, coins, streaks) complete and live. Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) is built on branch `phase-2b`, not merged or deployed yet
+**Status:** Phase 1, Phase 2 (accounts, coins, streaks) and Phase 2b (cat voice, study modes, phone fixes, subjects, streak calendar, room progress) complete and live
 
 ---
 
@@ -299,7 +299,7 @@ At first, magic links took ages: Supabase's built-in email sender is only for tr
 #### Testing the database without touching the real one
 `npm run test:db` runs all three migrations in **PGlite** (real Postgres compiled to WebAssembly, inside Node), with a stand-in for Supabase's `auth` schema, roles and default "everyone can do everything" grants. Two pretend users, Ana and Ben, go through **44 checks**: each sees only their own data, coins, streak, sessions, items and settings can't be written directly, session times come from the server, the daily cap holds, fake dates are pulled back, streaks count and reset, and the import happens once.
 
-### Step 18 — Phase 2b: voice, study modes, phones, subjects, calendar, room · built on branch `phase-2b` (not merged or deployed yet)
+### Step 18 — Phase 2b: voice, study modes, phones, subjects, calendar, room · built on `phase-2b`, merged into `main` and deployed
 Six parts, one commit each: `ecf4c61` voice, `04cae3d` study modes, `f7b55a6` phones, `b8e281d` subjects, `0bcfd27` calendar, `5a2af71` room progress.
 
 #### The database: paste 3 more files, in this order
